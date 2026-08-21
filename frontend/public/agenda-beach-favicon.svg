@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 68 68">
+  <defs>
+    <linearGradient id="gold" x1="8" y1="4" x2="58" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4C85B" />
+      <stop offset="1" stop-color="#DDA62F" />
+    </linearGradient>
+  </defs>
+  <rect x="6" y="9" width="56" height="54" rx="15" fill="#0B426C" />
+  <path d="M6 23c0-7.7 6.3-14 14-14h28c7.7 0 14 6.3 14 14v3H6v-3Z" fill="url(#gold)" />
+  <circle cx="21" cy="8" r="2.4" fill="#FFF8E8" />
+  <circle cx="48" cy="8" r="2.4" fill="#FFF8E8" />
+  <circle cx="50.5" cy="30.5" r="3.5" fill="#E1AD36" />
+  <path d="M50.5 27v7M47 30.5h7" stroke="#A77B1F" stroke-width=".75" opacity=".65" />
+  <ellipse cx="34" cy="40" rx="10" ry="13" transform="rotate(-18 34 40)" fill="none" stroke="#F8F5E9" stroke-width="2.2" />
+  <path d="m37.5 52 3.8 8" stroke="#F8F5E9" stroke-width="2.2" stroke-linecap="round" />
+  <circle cx="31" cy="35" r="1.2" fill="#F8F5E9" />
+  <circle cx="36" cy="38" r="1.2" fill="#F8F5E9" />
+  <circle cx="31.5" cy="42.5" r="1.2" fill="#F8F5E9" />
+  <circle cx="36.5" cy="46" r="1.2" fill="#F8F5E9" />
+</svg>
