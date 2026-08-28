@@ -1,0 +1,23 @@
+.auth-page {
+  display: grid;
+  grid-template-columns: minmax(500px, 1.08fr) minmax(520px, 0.92fr);
+  height: 100svh;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+@media (max-width: 1120px) {
+  .auth-page { grid-template-columns: minmax(440px, 0.9fr) minmax(500px, 1.1fr); }
+}
+
+@media (max-width: 860px) {
+  .auth-page {
+    display: block;
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+    padding-bottom: 32px;
+    background: #f6f8fa;
+  }
+}

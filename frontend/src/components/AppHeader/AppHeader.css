@@ -1,0 +1,84 @@
+.app-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 88px;
+  padding: 0 clamp(28px, 4.8vw, 78px);
+  color: white;
+  background: #0e568a;
+  box-shadow: 0 2px 10px rgba(8, 52, 83, 0.12);
+}
+
+.app-header__nav { display: flex; align-items: center; gap: 10px; }
+
+.app-header__nav button {
+  min-height: 45px;
+  padding: 0 20px;
+  color: rgba(255, 255, 255, 0.77);
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.app-header__nav button:hover { color: white; background: rgba(255, 255, 255, 0.08); }
+
+.app-header__nav .app-header__nav-item--active {
+  color: #164b70;
+  background: #edbd4e;
+  box-shadow: 0 7px 18px rgba(5, 44, 72, 0.16);
+  font-weight: 800;
+}
+
+.app-header__avatar {
+  justify-self: end;
+  width: 48px;
+  height: 48px;
+  color: #174d72;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  background: #edbd4e;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+@media (max-width: 1080px) {
+  .app-header { grid-template-columns: auto 1fr auto; }
+  .app-header .app-brand__wordmark { display: none; }
+  .app-header__nav { justify-content: center; }
+}
+
+@media (max-width: 820px) {
+  .app-header { grid-template-columns: 1fr auto; min-height: 72px; padding-inline: 20px; }
+  .app-header .app-brand__mark { width: 43px; height: 43px; }
+  .app-header .app-brand__wordmark { display: block; }
+  .app-header .app-brand__wordmark > div { font-size: 19px; }
+
+  .app-header__nav {
+    position: fixed;
+    z-index: 30;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    justify-content: space-around;
+    padding: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 15px;
+    background: #0e568a;
+    box-shadow: 0 10px 35px rgba(8, 52, 83, 0.28);
+  }
+
+  .app-header__nav button { min-height: 42px; padding-inline: 12px; font-size: 12px; }
+}
+
+@media (max-width: 590px) {
+  .app-header .app-brand__wordmark { display: none; }
+  .app-header__nav { gap: 2px; overflow-x: auto; }
+  .app-header__nav button { flex: 1; padding-inline: 7px; white-space: nowrap; }
+}
