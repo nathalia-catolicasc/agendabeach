@@ -1,6 +1,8 @@
 export { AppHeader } from './AppHeader'
 export type { NavigationItem } from './AppHeader'
 export { AuthPage } from './AuthPage'
+export { BookingModal } from './BookingModal'
+export type { ReservationDetails } from './BookingModal'
 export { Calendar } from './Calendar'
 export { Logo } from './Logo'
 export { PageHeading } from './PageHeading'

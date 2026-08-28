@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AppHeader, Calendar, PageHeading, ReservationSummary } from './components'
+import { AppHeader, BookingModal, Calendar, PageHeading, ReservationSummary } from './components'
+import type { ReservationDetails } from './components'
 import './BookingPage.css'
 
 const navigationItems = [
@@ -16,9 +17,15 @@ type BookingPageProps = {
 export default function BookingPage({ onLogout }: BookingPageProps) {
   const [displayedMonth, setDisplayedMonth] = useState(new Date(2026, 5, 1))
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
 
   function changeMonth(offset: number) {
     setDisplayedMonth((currentMonth) => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1))
+  }
+
+  function confirmReservation(reservation: ReservationDetails) {
+    console.log('Reserva confirmada', reservation)
+    setIsBookingModalOpen(false)
   }
 
   return (
@@ -43,9 +50,17 @@ export default function BookingPage({ onLogout }: BookingPageProps) {
             onChangeMonth={changeMonth}
             onSelectDate={setSelectedDate}
           />
-          <ReservationSummary selectedDate={selectedDate} />
+          <ReservationSummary selectedDate={selectedDate} onOpenBooking={() => setIsBookingModalOpen(true)} />
         </div>
       </main>
+
+      {isBookingModalOpen && selectedDate && (
+        <BookingModal
+          selectedDate={selectedDate}
+          onClose={() => setIsBookingModalOpen(false)}
+          onConfirm={confirmReservation}
+        />
+      )}
     </div>
   )
 }

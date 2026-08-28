@@ -2,6 +2,7 @@ import './ReservationSummary.css'
 
 type ReservationSummaryProps = {
   selectedDate: Date | null
+  onOpenBooking: () => void
 }
 
 function CalendarIcon() {
@@ -22,7 +23,7 @@ function getFullDateLabel(date: Date) {
   }).format(date)
 }
 
-export function ReservationSummary({ selectedDate }: ReservationSummaryProps) {
+export function ReservationSummary({ selectedDate, onOpenBooking }: ReservationSummaryProps) {
   return (
     <aside className="booking-summary" aria-live="polite">
       <div className="booking-summary__header">
@@ -37,7 +38,7 @@ export function ReservationSummary({ selectedDate }: ReservationSummaryProps) {
             <span className="booking-summary__label">DATA SELECIONADA</span>
             <strong>{getFullDateLabel(selectedDate)}</strong>
             <p>Agora escolha a quadra e o melhor horário para sua partida.</p>
-            <button type="button">Escolher quadra e horário</button>
+            <button type="button" onClick={onOpenBooking}>Escolher quadra e horário</button>
           </>
         ) : (
           <p>Nenhum dia selecionado.<br />Comece escolhendo uma data no calendário.</p>
