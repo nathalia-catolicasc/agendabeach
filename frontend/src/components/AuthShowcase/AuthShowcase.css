@@ -1,0 +1,101 @@
+.showcase {
+  position: relative;
+  height: 100svh;
+  padding: 42px clamp(42px, 5vw, 82px);
+  overflow: hidden;
+  color: white;
+  background: radial-gradient(circle at 13% 84%, rgba(232, 180, 65, 0.13), transparent 28%), linear-gradient(145deg, #115a8b 0%, #0c4c79 44%, #073555 100%);
+}
+
+.showcase::before,
+.showcase::after {
+  position: absolute;
+  content: '';
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.showcase::before { width: 430px; height: 430px; top: -210px; right: -170px; }
+.showcase::after { width: 610px; height: 610px; top: -300px; right: -260px; }
+
+.showcase__content {
+  position: relative;
+  z-index: 2;
+  max-width: 610px;
+  padding-top: clamp(90px, 13vh, 150px);
+}
+
+.showcase__eyebrow {
+  color: #edbd4e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2.4px;
+}
+
+.showcase__title {
+  margin-top: 17px;
+  color: white;
+  font-size: clamp(43px, 4.2vw, 65px);
+  line-height: 1.08;
+  letter-spacing: -2.2px;
+}
+
+.showcase__title span { position: relative; z-index: 1; color: #f0bd49; }
+
+.showcase__title span::after {
+  position: absolute;
+  content: '';
+  left: 1px;
+  right: 0;
+  bottom: -8px;
+  height: 7px;
+  opacity: 0.65;
+  border-top: 3px solid #f0bd49;
+  border-radius: 50%;
+  transform: rotate(-1.5deg);
+}
+
+.showcase__copy {
+  max-width: 525px;
+  margin-top: 25px;
+  color: rgba(255, 255, 255, 0.73);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.showcase__features { margin-top: 31px; }
+
+.showcase__features > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.87);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.showcase__features svg {
+  box-sizing: content-box;
+  padding: 4px;
+  color: #edbd4e;
+  border-radius: 999px;
+  background: rgba(232, 180, 65, 0.13);
+}
+
+.showcase__footer {
+  position: absolute;
+  left: clamp(42px, 5vw, 82px);
+  bottom: 30px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+}
+
+@media (max-width: 1120px) {
+  .showcase { padding-inline: 45px; }
+  .showcase__title { font-size: 47px; }
+  .showcase__features { align-items: flex-start; flex-direction: column; gap: 12px !important; }
+}
+
+@media (max-width: 860px) {
+  .showcase { display: none; }
+}

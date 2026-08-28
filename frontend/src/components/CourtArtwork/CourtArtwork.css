@@ -1,0 +1,75 @@
+.court-art {
+  position: absolute;
+  right: -40px;
+  bottom: 6px;
+  width: min(49vw, 650px);
+  height: 430px;
+  opacity: 0.58;
+}
+
+.court-art__lines { width: 100%; height: 100%; }
+
+.court-art__glow {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  right: 48px;
+  top: 5px;
+  border-radius: 50%;
+  background: rgba(232, 180, 65, 0.08);
+  filter: blur(2px);
+}
+
+.court-art__ball {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #edbd4e;
+  box-shadow: 0 0 16px rgba(232, 180, 65, 0.45);
+}
+
+.court-art__ball::after {
+  position: absolute;
+  content: '';
+  inset: 2px;
+  border-left: 1px solid rgba(9, 58, 95, 0.55);
+  border-radius: 50%;
+}
+
+.court-art__ball--one { top: 45px; left: 92px; }
+.court-art__ball--two { top: 176px; left: 45px; width: 7px; height: 7px; }
+
+.court-art__badge {
+  position: absolute;
+  right: 62px;
+  bottom: 53px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  color: #0a426c;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 30px rgba(4, 36, 59, 0.22);
+}
+
+.court-art__badge > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: white;
+  border-radius: 50%;
+  background: #2cad63;
+}
+
+.court-art__badge strong,
+.court-art__badge small { display: block; }
+.court-art__badge strong { font-size: 11px; }
+.court-art__badge small { margin-top: 2px; color: #6e7c88; font-size: 8px; }
+
+@media (max-width: 1120px) {
+  .court-art { right: -125px; }
+}

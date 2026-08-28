@@ -1,0 +1,12 @@
+.success-state {
+  display: flex;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+.success-state h3 { color: #103f62; }
+.success-state p { max-width: 320px; font-size: 14px; line-height: 1.55; }
+.success-state .mantine-Button-root { margin-top: 8px; }

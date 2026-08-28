@@ -1,0 +1,47 @@
+.app-brand {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  width: max-content;
+  color: white;
+}
+
+.app-brand__mark {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 7px 12px rgba(0, 0, 0, 0.12));
+}
+
+.app-brand__wordmark > div {
+  display: flex;
+  align-items: baseline;
+  color: white;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+
+.app-brand__wordmark strong { font-weight: 800; }
+.app-brand__wordmark span { color: #edbd4e; font-weight: 500; }
+
+.app-brand__wordmark small {
+  display: block;
+  margin-top: 7px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 3.1px;
+}
+
+.app-brand--compact { gap: 10px; }
+.app-brand--compact .app-brand__mark { width: 48px; height: 48px; }
+.app-brand--compact .app-brand__wordmark > div { font-size: 22px; letter-spacing: -0.7px; }
+
+@media (max-width: 480px) {
+  .app-brand__mark { width: 45px; height: 45px; }
+  .app-brand__wordmark > div { font-size: 23px; }
+  .app-brand__wordmark small { font-size: 6.4px; letter-spacing: 2.5px; }
+}
