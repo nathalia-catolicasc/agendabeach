@@ -1,20 +1,15 @@
 import { useState } from 'react'
 import { AppHeader, BookingModal, Calendar, PageHeading, ReservationSummary } from './components'
 import type { ReservationDetails } from './components'
+import { navigationItems } from './navigation'
 import './BookingPage.css'
 
-const navigationItems = [
-  { label: 'Início', value: 'home' },
-  { label: 'Agendar', value: 'booking' },
-  { label: 'Minhas reservas', value: 'reservations' },
-  { label: 'Quadras', value: 'courts' },
-]
-
 type BookingPageProps = {
+  onNavigate: (value: string) => void
   onLogout: () => void
 }
 
-export default function BookingPage({ onLogout }: BookingPageProps) {
+export default function BookingPage({ onNavigate, onLogout }: BookingPageProps) {
   const [displayedMonth, setDisplayedMonth] = useState(new Date(2026, 5, 1))
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
@@ -33,6 +28,7 @@ export default function BookingPage({ onLogout }: BookingPageProps) {
       <AppHeader
         activeItem="booking"
         navigationItems={navigationItems}
+        onNavigate={onNavigate}
         onAvatarClick={onLogout}
       />
 
