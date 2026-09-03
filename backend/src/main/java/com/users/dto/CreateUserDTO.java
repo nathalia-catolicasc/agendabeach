@@ -1,4 +1,4 @@
-package com.agendabeach.dto;
+package com.users.dto;
 
 public record CreateUserDTO(
         String name,

@@ -1,4 +1,4 @@
-package com.agendabeach.entity;
+package com.bookings.enums;
 
 public enum BookingStatus {
     SCHEDULED,

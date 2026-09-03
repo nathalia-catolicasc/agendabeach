@@ -1,7 +1,7 @@
-package com.agendabeach.entity;
+package com.bookings.entity;
 
 import jakarta.persistence.*;
-import com.agendabeach.enum.*;
+import com.bookings.enums.*;
 import java.time.LocalDateTime;
 
 @Entity
@@ -60,5 +60,15 @@ public class Court {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @PrePersist
+    void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = CourtStatus.ACTIVE;
+        }
     }
 }

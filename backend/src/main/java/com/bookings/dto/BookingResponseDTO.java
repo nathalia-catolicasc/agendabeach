@@ -1,6 +1,6 @@
-package com.agendabeach.dto;
+package com.bookings.dto;
 
-import com.agendabeach.entity.BookingStatus;
+import com.bookings.enums.BookingStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

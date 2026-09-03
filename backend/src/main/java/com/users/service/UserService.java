@@ -1,12 +1,16 @@
-package com.agendabeach.service;
+package com.users.service;
 
-import com.agendabeach.dto.CreateUserDTO;
-import com.agendabeach.dto.LoginDTO;
-import com.agendabeach.dto.UserResponseDTO;
-import com.agendabeach.entity.User;
-import com.agendabeach.repository.UserRepository;
+import com.users.dto.CreateUserDTO;
+import com.users.dto.LoginDTO;
+import com.users.dto.UpdateUserDTO;
+import com.users.dto.UserResponseDTO;
+import com.users.entity.User;
+import com.users.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -51,5 +55,42 @@ public class UserService {
                 user.getName(),
                 user.getEmail()
         );
+    }
+
+    public List<UserResponseDTO> listAll() {
+        return userRepository.findAll().stream()
+                .map(u -> new UserResponseDTO(u.getId(), u.getName(), u.getEmail()))
+                .collect(Collectors.toList());
+    }
+
+    public UserResponseDTO getById(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return new UserResponseDTO(user.getId(), user.getName(), user.getEmail());
+    }
+
+    public UserResponseDTO update(Long id, UpdateUserDTO dto) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (dto.name() != null && !dto.name().isBlank()) {
+            user.setName(dto.name());
+        }
+        if (dto.email() != null && !dto.email().isBlank()) {
+            user.setEmail(dto.email());
+        }
+        if (dto.password() != null && !dto.password().isBlank()) {
+            user.setPassword(passwordEncoder.encode(dto.password()));
+        }
+
+        User saved = userRepository.save(user);
+        return new UserResponseDTO(saved.getId(), saved.getName(), saved.getEmail());
+    }
+
+    public void delete(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new RuntimeException("User not found");
+        }
+        userRepository.deleteById(id);
     }
 }

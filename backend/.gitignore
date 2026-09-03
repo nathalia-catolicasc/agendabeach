@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Dotenv (não versionar credenciais locais)
+.env
+.env.*
