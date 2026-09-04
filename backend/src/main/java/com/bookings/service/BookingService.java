@@ -14,8 +14,10 @@ import com.users.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -60,7 +62,12 @@ public class BookingService {
         booking.setEndTime(dto.endTime());
         booking.setStatus(BookingStatus.SCHEDULED);
         booking.setCreatedAt(LocalDateTime.now());
-        booking.setCourtPrice(BigDecimal.ZERO);
+
+        BigDecimal calculatedPrice = calculatePrice(booking.getStartTime(), booking.getEndTime(), court);
+        if (calculatedPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Calculated price must be greater than or equal to zero");
+        }
+        booking.setCourtPrice(calculatedPrice);
 
         Booking savedBooking = bookingRepository.save(booking);
 
@@ -177,6 +184,12 @@ public class BookingService {
             throw new RuntimeException("End time must be after start time");
         }
 
+        BigDecimal recalculatedPrice = calculatePrice(booking.getStartTime(), booking.getEndTime(), booking.getCourt());
+        if (recalculatedPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Calculated price must be greater than or equal to zero");
+        }
+        booking.setCourtPrice(recalculatedPrice);
+
         Booking saved = bookingRepository.save(booking);
         return new BookingResponseDTO(
                 saved.getId(),
@@ -216,7 +229,7 @@ public class BookingService {
         BigDecimal price = booking.getCourtPrice() == null ? BigDecimal.ZERO : booking.getCourtPrice();
         BigDecimal refund;
         if (hoursUntilStart >= 24) {
-            refund = price; // 100%
+            refund = price;
         } else if (hoursUntilStart >= 12) {
             refund = price.multiply(new BigDecimal("0.5"));
         } else {
@@ -233,5 +246,64 @@ public class BookingService {
                 booking.getStatus().name(),
                 booking.getCancelledAt()
         );
+    }
+
+    private static final BigDecimal BASE_PRICE_OPEN = new BigDecimal("100.00");
+    private static final BigDecimal BASE_PRICE_COVERED = new BigDecimal("120.00");
+    private static final int PEAK_START_HOUR = 18;
+    private static final int PEAK_END_HOUR = 22;
+    private static final BigDecimal PEAK_MULTIPLIER = new BigDecimal("1.20");
+
+    private BigDecimal calculatePrice(LocalDateTime start, LocalDateTime end, com.bookings.entity.Court court) {
+        if (start == null || end == null || court == null) {
+            throw new RuntimeException("Invalid data to calculate price");
+        }
+
+        BigDecimal basePerHour = court.getType() != null && court.getType().name().equals("COVERED")
+                ? BASE_PRICE_COVERED
+                : BASE_PRICE_OPEN;
+
+        BigDecimal basePerMinute = basePerHour.divide(new BigDecimal(60), 10, RoundingMode.HALF_UP);
+
+        long totalMinutes = java.time.Duration.between(start, end).toMinutes();
+        if (totalMinutes <= 0) {
+            throw new RuntimeException("End time must be after start time");
+        }
+
+        long peakMinutes = calculatePeakMinutes(start, end);
+        long normalMinutes = totalMinutes - peakMinutes;
+
+        BigDecimal normalPart = basePerMinute.multiply(new BigDecimal(normalMinutes));
+        BigDecimal peakPart = basePerMinute.multiply(PEAK_MULTIPLIER).multiply(new BigDecimal(peakMinutes));
+
+        BigDecimal total = normalPart.add(peakPart).setScale(2, RoundingMode.HALF_UP);
+        return total.max(BigDecimal.ZERO);
+    }
+
+    private long calculatePeakMinutes(LocalDateTime start, LocalDateTime end) {
+        long minutes = 0;
+
+        LocalDateTime cursor = start;
+        while (cursor.isBefore(end)) {
+            LocalDate day = cursor.toLocalDate();
+            LocalDateTime peakStart = LocalDateTime.of(day, LocalTime.of(PEAK_START_HOUR, 0));
+            LocalDateTime peakEnd = LocalDateTime.of(day, LocalTime.of(PEAK_END_HOUR, 0));
+
+            LocalDateTime sliceStart = max(cursor, peakStart);
+            LocalDateTime sliceEnd = min(end, peakEnd);
+            long m = Math.max(0, java.time.Duration.between(sliceStart, sliceEnd).toMinutes());
+            minutes += m;
+
+            cursor = LocalDateTime.of(day.plusDays(1), LocalTime.MIDNIGHT);
+        }
+        return minutes;
+    }
+
+    private static LocalDateTime max(LocalDateTime a, LocalDateTime b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalDateTime min(LocalDateTime a, LocalDateTime b) {
+        return a.isBefore(b) ? a : b;
     }
 }
