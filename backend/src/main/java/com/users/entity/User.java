@@ -1,6 +1,7 @@
 package com.users.entity;
 
 import jakarta.persistence.*;
+import com.users.enums.ProfileType;
 
 @Entity
 @Table(name = "users")
@@ -18,6 +19,10 @@ public class User {
 
     @Column(nullable = false)
     private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ProfileType profile;
 
     public Long getId() {
         return id;
@@ -45,5 +50,13 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public ProfileType getProfile() {
+        return profile;
+    }
+
+    public void setProfile(ProfileType profile) {
+        this.profile = profile;
     }
 }
