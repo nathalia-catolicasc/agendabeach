@@ -6,6 +6,7 @@ import com.users.dto.UpdateUserDTO;
 import com.users.dto.UserResponseDTO;
 import com.users.entity.User;
 import com.users.repository.UserRepository;
+import com.users.enums.ProfileType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,7 @@ public class UserService {
         user.setName(dto.name());
         user.setEmail(dto.email());
         user.setPassword(passwordEncoder.encode(dto.password()));
+        user.setProfile(ProfileType.CLIENT);
 
         User savedUser = userRepository.save(user);
 
