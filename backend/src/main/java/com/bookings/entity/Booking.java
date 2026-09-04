@@ -1,6 +1,8 @@
-package com.agendabeach.entity;
+package com.bookings.entity;
 
 import jakarta.persistence.*;
+import com.bookings.enums.BookingStatus;
+import com.users.entity.User;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -106,5 +108,15 @@ public class Booking {
 
     public void setCancelledAt(LocalDateTime cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    @PrePersist
+    void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = BookingStatus.SCHEDULED;
+        }
     }
 }

@@ -1,6 +1,6 @@
-package com.agendabeach.repository;
+package com.users.repository;
 
-import com.agendabeach.entity.User;
+import com.users.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

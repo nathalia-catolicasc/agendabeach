@@ -1,4 +1,4 @@
-package com.agendabeach.entity;
+package com.users.entity;
 
 import jakarta.persistence.*;
 
