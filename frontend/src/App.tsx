@@ -1,15 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminPage from './AdminPage'
 import BookingPage from './BookingPage'
 import CancelBookingPage from './CancelBookingPage'
 import MyReservationsPage from './MyReservationsPage'
 import { AuthPage } from './components'
-import { clearStoredSession, getStoredSession, storeSession } from './session'
+import { clearStoredSession, getStoredSession, storeSession, SESSION_CLEARED_EVENT } from './session'
+import { logout } from './api'
 import type { SessionUser } from './session'
 
 function App() {
   const [user, setUser] = useState<SessionUser | null>(() => getStoredSession())
   const [currentPage, setCurrentPage] = useState('booking')
+
+  useEffect(() => {
+    const clear = () => {
+      setUser(null)
+      setCurrentPage('booking')
+    }
+    window.addEventListener(SESSION_CLEARED_EVENT, clear)
+    return () => window.removeEventListener(SESSION_CLEARED_EVENT, clear)
+  }, [])
 
   function handleLogin(loggedUser: SessionUser) {
     storeSession(loggedUser)
@@ -18,6 +28,9 @@ function App() {
   }
 
   function handleLogout() {
+    void logout().catch(() => {
+      /* O logout local continua disponível quando a API está indisponível. */
+    })
     clearStoredSession()
     setUser(null)
     setCurrentPage('booking')

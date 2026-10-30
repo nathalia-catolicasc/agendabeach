@@ -5,10 +5,12 @@ import com.users.dto.LoginDTO;
 import com.users.dto.UpdateUserDTO;
 import com.users.dto.UserResponseDTO;
 import com.users.entity.User;
-import com.users.repository.UserRepository;
 import com.users.enums.ProfileType;
+import com.users.repository.UserRepository;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,10 +21,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder
-    ) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -30,6 +29,7 @@ public class UserService {
     public UserResponseDTO create(CreateUserDTO dto) {
         User user = new User();
 
+        user.setCpf(CpfValidator.normalize(dto.cpf()));
         user.setName(dto.name());
         user.setEmail(dto.email());
         user.setPassword(passwordEncoder.encode(dto.password()));
@@ -40,41 +40,57 @@ public class UserService {
         return new UserResponseDTO(
                 savedUser.getId(),
                 savedUser.getName(),
-                savedUser.getEmail()
-        );
+                savedUser.getEmail(),
+                savedUser.getProfile());
     }
 
     public UserResponseDTO login(LoginDTO dto) {
-        User user = userRepository.findByEmail(dto.email())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        User user =
+                userRepository
+                        .findByEmail(dto.email())
+                        .orElseThrow(
+                                () ->
+                                        new org.springframework.web.server.ResponseStatusException(
+                                                org.springframework.http.HttpStatus.UNAUTHORIZED,
+                                                "Invalid email or password"));
 
         if (!passwordEncoder.matches(dto.password(), user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         return new UserResponseDTO(
-                user.getId(),
-                user.getName(),
-                user.getEmail()
-        );
+                user.getId(), user.getName(), user.getEmail(), user.getProfile());
     }
 
     public List<UserResponseDTO> listAll() {
         return userRepository.findAll().stream()
-                .map(u -> new UserResponseDTO(u.getId(), u.getName(), u.getEmail()))
+                .map(u -> new UserResponseDTO(u.getId(), u.getName(), u.getEmail(), u.getProfile()))
                 .collect(Collectors.toList());
     }
 
     public UserResponseDTO getById(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return new UserResponseDTO(user.getId(), user.getName(), user.getEmail());
+        User user =
+                userRepository
+                        .findById(id)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+        return new UserResponseDTO(
+                user.getId(), user.getName(), user.getEmail(), user.getProfile());
     }
 
+    @Transactional
     public UserResponseDTO update(Long id, UpdateUserDTO dto) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user =
+                userRepository
+                        .lockById(id)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
 
+        if (dto.cpf() != null) {
+            String cpf = CpfValidator.normalize(dto.cpf());
+            if (user.getCpf() != null && !user.getCpf().equals(cpf))
+                throw new IllegalArgumentException("Registered CPF cannot change");
+            user.setCpf(cpf);
+        }
         if (dto.name() != null && !dto.name().isBlank()) {
             user.setName(dto.name());
         }
@@ -86,7 +102,8 @@ public class UserService {
         }
 
         User saved = userRepository.save(user);
-        return new UserResponseDTO(saved.getId(), saved.getName(), saved.getEmail());
+        return new UserResponseDTO(
+                saved.getId(), saved.getName(), saved.getEmail(), saved.getProfile());
     }
 
     public void delete(Long id) {

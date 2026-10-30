@@ -27,6 +27,13 @@ export type ApiUser = {
   id: number
   name: string
   email: string
+  profile: ProfileType
+}
+
+export type LoginResponse = ApiUser & {
+  accessToken: string
+  tokenType: 'Bearer'
+  expiresAt: string
 }
 
 /** Resposta de POST /bookings/{id}/cancel (CancellationResponseDTO). */

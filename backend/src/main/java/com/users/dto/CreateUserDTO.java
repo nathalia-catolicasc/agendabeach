@@ -1,8 +1,9 @@
 package com.users.dto;
 
+import jakarta.validation.constraints.*;
+
 public record CreateUserDTO(
-        String name,
-        String email,
-        String password
-) {
-}
+        @NotBlank String name,
+        @NotBlank @Email String email,
+        @NotBlank @Size(min = 8, max = 72) String password,
+        @NotBlank String cpf) {}

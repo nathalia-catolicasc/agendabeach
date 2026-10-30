@@ -12,6 +12,6 @@ public record BookingResponseDTO(
         LocalDateTime startTime,
         LocalDateTime endTime,
         BigDecimal courtPrice,
-        BookingStatus status
-) {
-}
+        BigDecimal creditUsed,
+        BigDecimal amountDue,
+        BookingStatus status) {}

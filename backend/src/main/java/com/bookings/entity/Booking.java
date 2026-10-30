@@ -1,8 +1,12 @@
 package com.bookings.entity;
 
-import jakarta.persistence.*;
 import com.bookings.enums.BookingStatus;
 import com.users.entity.User;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,7 +37,8 @@ public class Booking {
     private BigDecimal courtPrice;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "booking_status")
     private BookingStatus status;
 
     @Column(name = "created_at", nullable = false)
@@ -41,6 +46,31 @@ public class Booking {
 
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
+
+    @Column(name = "credit_used", nullable = false)
+    private BigDecimal creditUsed = BigDecimal.ZERO;
+
+    public BigDecimal getCreditUsed() {
+        return creditUsed;
+    }
+
+    public void setCreditUsed(BigDecimal value) {
+        creditUsed = value;
+    }
+
+    @Column(name = "refund_amount")
+    private BigDecimal refundAmount;
+
+    @Column(name = "cancellation_credit")
+    private BigDecimal cancellationCredit;
+
+    public void setRefundAmount(BigDecimal value) {
+        refundAmount = value;
+    }
+
+    public void setCancellationCredit(BigDecimal value) {
+        cancellationCredit = value;
+    }
 
     public Long getId() {
         return id;

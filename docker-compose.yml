@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:16
+    container_name: agendabeach-db
+    environment:
+      POSTGRES_DB: agendabeach
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agendabeach"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: agendabeach-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/agendabeach
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Só sobe sob demanda (perfil "test") — ver seção 2
+  backend-unit-tests:
+    build:
+      context: ./backend
+      target: build
+    container_name: agendabeach-backend-unit-tests
+    entrypoint: ["mvn", "-B", "-Dtest=UserServiceTest,BookingServiceTest", "test"]
+    profiles: ["test"]
+
+  backend-integration-tests:
+    build:
+      context: ./backend
+      target: build
+    container_name: agendabeach-backend-integration-tests
+    entrypoint: ["mvn", "-B", "-Dtest=AgendaBeachApplicationTests", "test"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/agendabeach
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["test"]
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: agendabeach-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

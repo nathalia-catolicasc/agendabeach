@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Alert, Anchor, Button, Checkbox, Divider, Group, PasswordInput, Stack, Text, TextInput } from '@mantine/core'
 import { ArrowIcon, LockIcon, MailIcon } from '../Icons'
-import { ApiError, detectProfile, login } from '../../api'
+import { ApiError, login } from '../../api'
 import type { SessionUser } from '../../session'
 
 type LoginFormProps = {
@@ -23,13 +23,9 @@ export function LoginForm({ onLogin, onShowRegister }: LoginFormProps) {
 
     try {
       const user = await login(email.trim(), password)
-      const profile = await detectProfile(user.id)
-      onLogin({ ...user, profile })
+      onLogin(user)
     } catch (caught) {
-      // O backend devolve 500 quando o login falha, então só confiamos na mensagem
-      // original quando o problema foi de conexão (status 0).
-      const offline = caught instanceof ApiError && caught.status === 0
-      setError(offline ? caught.message : 'E-mail ou senha inválidos.')
+      setError(caught instanceof ApiError && caught.status !== 401 ? caught.message : 'E-mail ou senha inválidos.')
       setLoading(false)
     }
   }

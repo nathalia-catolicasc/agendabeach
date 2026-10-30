@@ -190,7 +190,7 @@ export default function AdminPage({ user, onNavigate, onLogout }: AdminPageProps
 
     void runAction(
       async () => {
-        await createCourt({ name, type: courtType, status: 'ACTIVE' }, user.id)
+        await createCourt({ name, type: courtType, status: 'ACTIVE' })
         setCourtName('')
       },
       `Quadra "${name}" cadastrada.`,
@@ -203,7 +203,7 @@ export default function AdminPage({ user, onNavigate, onLogout }: AdminPageProps
 
     void runAction(
       async () => {
-        await updateCourt(court.id, { status: nextStatus }, user.id)
+        await updateCourt(court.id, { status: nextStatus })
       },
       `Quadra "${court.name}" ${nextStatus === 'ACTIVE' ? 'ativada' : 'desativada'}.`,
       'Não foi possível atualizar o status da quadra.',
@@ -228,7 +228,7 @@ export default function AdminPage({ user, onNavigate, onLogout }: AdminPageProps
     const { court } = pending
     void runAction(
       async () => {
-        await deleteCourt(court.id, user.id)
+        await deleteCourt(court.id)
       },
       `Quadra "${court.name}" removida.`,
       'Não foi possível remover a quadra. Quadras com reservas registradas não podem ser excluídas — desative-a.',
@@ -284,13 +284,6 @@ export default function AdminPage({ user, onNavigate, onLogout }: AdminPageProps
             {loading ? 'Atualizando…' : 'Atualizar dados'}
           </button>
         </div>
-
-        {user.profile === 'UNKNOWN' && (
-          <div className="admin-banner admin-banner--warn" role="status">
-            Não foi possível confirmar seu perfil no servidor (nenhuma quadra cadastrada para a verificação). As ações
-            administrativas continuam protegidas pelo backend.
-          </div>
-        )}
 
         {loadError && (
           <div className="admin-banner admin-banner--error" role="alert">

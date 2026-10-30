@@ -1,28 +1,45 @@
-import type { ProfileType } from './api/types'
+import type { LoginResponse } from './api/types'
 
-export type SessionUser = {
-  id: number
-  name: string
-  email: string
-  /** 'UNKNOWN' quando não foi possível confirmar o perfil no backend. */
-  profile: ProfileType | 'UNKNOWN'
-}
+export type SessionUser = LoginResponse
 
 const STORAGE_KEY = 'agendabeach.session'
+export const SESSION_CLEARED_EVENT = 'agendabeach:session-cleared'
+let memorySession: SessionUser | null = null
+
+function isSessionUser(value: unknown): value is SessionUser {
+  if (!value || typeof value !== 'object') return false
+  const user = value as Partial<SessionUser>
+  return (
+    typeof user.id === 'number' &&
+    typeof user.name === 'string' &&
+    typeof user.email === 'string' &&
+    (user.profile === 'CLIENT' || user.profile === 'ADMIN') &&
+    typeof user.accessToken === 'string' &&
+    user.accessToken.length > 0 &&
+    user.tokenType === 'Bearer' &&
+    typeof user.expiresAt === 'string'
+  )
+}
 
 export function getStoredSession(): SessionUser | null {
+  if (memorySession) return memorySession
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-
-    const parsed = JSON.parse(raw) as SessionUser
-    return typeof parsed?.id === 'number' ? parsed : null
+    const parsed: unknown = JSON.parse(raw)
+    if (!isSessionUser(parsed)) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+    memorySession = parsed
+    return parsed
   } catch {
     return null
   }
 }
 
 export function storeSession(user: SessionUser) {
+  memorySession = user
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
   } catch {
@@ -31,20 +48,21 @@ export function storeSession(user: SessionUser) {
 }
 
 export function clearStoredSession() {
+  memorySession = null
   try {
     window.localStorage.removeItem(STORAGE_KEY)
   } catch {
     /* nada a fazer */
   }
+  window.dispatchEvent(new Event(SESSION_CLEARED_EVENT))
 }
 
 export function isAdmin(user: SessionUser | null) {
   return user?.profile === 'ADMIN'
 }
 
-/** Perfil não confirmado: liberamos a navegação e deixamos o backend validar cada ação. */
 export function canTryAdmin(user: SessionUser | null) {
-  return user?.profile === 'ADMIN' || user?.profile === 'UNKNOWN'
+  return isAdmin(user)
 }
 
 export function getInitials(name: string) {

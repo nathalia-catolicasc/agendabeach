@@ -1,14 +1,15 @@
 package com.bookings.controller;
 
 import com.bookings.dto.BookingResponseDTO;
-import com.bookings.dto.CreateBookingDTO;
 import com.bookings.dto.CancellationResponseDTO;
+import com.bookings.dto.CreateBookingDTO;
 import com.bookings.dto.UpdateBookingDTO;
 import com.bookings.service.BookingService;
+
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/bookings")
@@ -21,9 +22,7 @@ public class BookingController {
     }
 
     @PostMapping
-    public BookingResponseDTO create(
-            @RequestBody CreateBookingDTO dto
-    ) {
+    public BookingResponseDTO create(@jakarta.validation.Valid @RequestBody CreateBookingDTO dto) {
         return bookingService.create(dto);
     }
 
@@ -47,11 +46,16 @@ public class BookingController {
         bookingService.delete(id);
     }
 
+    @GetMapping("/availability")
+    public List<com.bookings.dto.AvailabilityDTO> availability(
+            @RequestParam LocalDate date, @RequestParam Long courtId) {
+        return bookingService.availability(date, courtId);
+    }
+
     @GetMapping("/search")
     public List<BookingResponseDTO> searchByDate(
             @RequestParam("date") String date,
-            @RequestParam(value = "courtId", required = false) Long courtId
-    ) {
+            @RequestParam(value = "courtId", required = false) Long courtId) {
         LocalDate d = LocalDate.parse(date);
         if (courtId != null) {
             return bookingService.listByDateAndCourt(d, courtId);

@@ -1,150 +1,246 @@
 package com.bookings.service;
 
-import com.bookings.dto.BookingResponseDTO;
-import com.bookings.dto.CancellationResponseDTO;
-import com.bookings.dto.CreateBookingDTO;
-import com.bookings.dto.UpdateBookingDTO;
-import com.bookings.entity.Booking;
-import com.bookings.enums.BookingStatus;
-import com.bookings.entity.Court;
-import com.bookings.repository.BookingRepository;
-import com.bookings.repository.CourtRepository;
+import com.bookings.dto.*;
+import com.bookings.entity.*;
+import com.bookings.enums.*;
+import com.bookings.repository.*;
 import com.users.entity.User;
 import com.users.repository.UserRepository;
-import org.springframework.stereotype.Service;
+import com.users.service.AuthService;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.*;
+import java.time.*;
+import java.util.*;
 
 @Service
+@Transactional
 public class BookingService {
-
-    private final BookingRepository bookingRepository;
-    private final UserRepository userRepository;
-    private final CourtRepository courtRepository;
+    private final BookingRepository bookings;
+    private final UserRepository users;
+    private final CourtRepository courts;
+    private final PricingService prices;
+    private final AuthService auth;
+    private final Clock clock;
 
     public BookingService(
-            BookingRepository bookingRepository,
-            UserRepository userRepository,
-            CourtRepository courtRepository
-    ) {
-        this.bookingRepository = bookingRepository;
-        this.userRepository = userRepository;
-        this.courtRepository = courtRepository;
+            BookingRepository bookings,
+            UserRepository users,
+            CourtRepository courts,
+            PricingService prices,
+            AuthService auth,
+            Clock clock) {
+        this.bookings = bookings;
+        this.users = users;
+        this.courts = courts;
+        this.prices = prices;
+        this.auth = auth;
+        this.clock = clock;
     }
 
     public BookingResponseDTO create(CreateBookingDTO dto) {
-
-        User user = userRepository.findById(dto.userId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        Court court = courtRepository.findById(dto.courtId())
-                .orElseThrow(() -> new RuntimeException("Court not found"));
-
-        if (court.getStatus().name().equals("INACTIVE")) {
-            throw new RuntimeException("Court is inactive");
-        }
-
-        if (!dto.endTime().isAfter(dto.startTime())) {
-            throw new RuntimeException("End time must be after start time");
-        }
-
+        Long current = auth.currentId();
+        if (dto.userId() != null && !dto.userId().equals(current)) auth.ensureAdmin();
+        Long userId = dto.userId() == null ? current : dto.userId();
+        // The user lock serializes the quota and wallet across different courts and API instances.
+        User user = users.lockById(userId).orElseThrow(() -> missing("User"));
+        if (user.getCpf() == null)
+            throw new IllegalStateException("Register a valid CPF before booking");
+        validateSlot(dto.startTime(), dto.endTime());
+        if (bookings.countByUserIdAndStatusAndStartTimeAfter(userId, BookingStatus.SCHEDULED, now())
+                >= 3) throw new IllegalStateException("Maximum of three future bookings per CPF");
+        Court court = courts.lockById(dto.courtId()).orElseThrow(() -> missing("Court"));
+        validateCourt(court);
+        ensureVacant(court.getId(), dto.startTime(), dto.endTime(), null);
         Booking booking = new Booking();
-
         booking.setUser(user);
         booking.setCourt(court);
         booking.setStartTime(dto.startTime());
         booking.setEndTime(dto.endTime());
         booking.setStatus(BookingStatus.SCHEDULED);
-        booking.setCreatedAt(LocalDateTime.now());
-
-        BigDecimal calculatedPrice = calculatePrice(booking.getStartTime(), booking.getEndTime(), court);
-        if (calculatedPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Calculated price must be greater than or equal to zero");
+        booking.setCreatedAt(now());
+        BigDecimal price = prices.price(dto.startTime());
+        booking.setCourtPrice(price);
+        if (Boolean.TRUE.equals(dto.useCredit())) {
+            BigDecimal used = user.getCreditBalance().min(price);
+            user.setCreditBalance(user.getCreditBalance().subtract(used));
+            booking.setCreditUsed(used);
         }
-        booking.setCourtPrice(calculatedPrice);
-
-        Booking savedBooking = bookingRepository.save(booking);
-
-        return new BookingResponseDTO(
-                savedBooking.getId(),
-                savedBooking.getUser().getId(),
-                savedBooking.getCourt().getId(),
-                savedBooking.getStartTime(),
-                savedBooking.getEndTime(),
-                savedBooking.getCourtPrice(),
-                savedBooking.getStatus()
-        );
+        return response(bookings.saveAndFlush(booking));
     }
 
-    public List<BookingResponseDTO> listAll() {
-        return bookingRepository.findAll().stream()
-                .map(b -> new BookingResponseDTO(
-                        b.getId(),
-                        b.getUser().getId(),
-                        b.getCourt().getId(),
-                        b.getStartTime(),
-                        b.getEndTime(),
-                        b.getCourtPrice(),
-                        b.getStatus()
-                ))
-                .collect(Collectors.toList());
+    public BookingResponseDTO update(Long id, UpdateBookingDTO dto) {
+        Long owner = bookings.ownerId(id).orElseThrow(() -> missing("Booking"));
+        auth.ensureOwner(owner);
+        User user = users.lockById(owner).orElseThrow();
+        Booking b = bookings.lockById(id).orElseThrow(() -> missing("Booking"));
+        requireFutureScheduled(b);
+        if (Duration.between(now(), b.getStartTime()).compareTo(Duration.ofHours(24)) <= 0)
+            throw new IllegalStateException(
+                    "Rescheduling requires more than 24 hours notice; cancel and rebook");
+        if (dto.userId() != null && !dto.userId().equals(user.getId()))
+            throw new IllegalArgumentException("Booking owner cannot change");
+        if (b.getCreditUsed().signum() != 0)
+            throw new IllegalStateException("Cancel and rebook reservations paid with credit");
+        LocalDateTime start = dto.startTime() == null ? b.getStartTime() : dto.startTime();
+        LocalDateTime end = dto.endTime() == null ? b.getEndTime() : dto.endTime();
+        validateSlot(start, end);
+        Long courtId = dto.courtId() == null ? b.getCourt().getId() : dto.courtId();
+        Court court = courts.lockById(courtId).orElseThrow(() -> missing("Court"));
+        validateCourt(court);
+        ensureVacant(courtId, start, end, id);
+        if (prices.price(start).compareTo(b.getCourtPrice()) != 0)
+            throw new IllegalStateException("Price changes require cancellation and a new booking");
+        b.setCourt(court);
+        b.setStartTime(start);
+        b.setEndTime(end);
+        return response(bookings.saveAndFlush(b));
     }
 
-    public List<BookingResponseDTO> listByDate(LocalDate date) {
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.plusDays(1).atStartOfDay();
-        return bookingRepository.findAllByStartTimeBetween(start, end).stream()
-                .map(b -> new BookingResponseDTO(
-                        b.getId(),
-                        b.getUser().getId(),
-                        b.getCourt().getId(),
-                        b.getStartTime(),
-                        b.getEndTime(),
-                        b.getCourtPrice(),
-                        b.getStatus()
-                ))
-                .collect(Collectors.toList());
+    public CancellationResponseDTO cancel(Long id) {
+        Long owner = bookings.ownerId(id).orElseThrow(() -> missing("Booking"));
+        auth.ensureOwner(owner);
+        User user = users.lockById(owner).orElseThrow();
+        Booking b = bookings.lockById(id).orElseThrow(() -> missing("Booking"));
+        requireFutureScheduled(b);
+        Duration remaining = Duration.between(now(), b.getStartTime());
+        BigDecimal refund = BigDecimal.ZERO.setScale(2);
+        BigDecimal credit = BigDecimal.ZERO.setScale(2);
+        if (remaining.compareTo(Duration.ofHours(24)) > 0) {
+            refund = b.getCourtPrice().subtract(b.getCreditUsed());
+            credit = b.getCreditUsed().setScale(2);
+        } else if (remaining.compareTo(Duration.ofHours(2)) >= 0) {
+            credit =
+                    b.getCourtPrice()
+                            .multiply(new BigDecimal("0.50"))
+                            .setScale(2, RoundingMode.HALF_UP);
+        }
+        b.setRefundAmount(refund);
+        b.setCancellationCredit(credit);
+        user.setCreditBalance(user.getCreditBalance().add(credit));
+        b.setStatus(BookingStatus.CANCELLED);
+        b.setCancelledAt(now());
+        bookings.saveAndFlush(b);
+        return new CancellationResponseDTO(
+                id, refund, credit, b.getStatus().name(), b.getCancelledAt());
     }
 
-    public List<BookingResponseDTO> listByDateAndCourt(LocalDate date, Long courtId) {
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.plusDays(1).atStartOfDay();
-        return bookingRepository.findAllByCourt_IdAndStartTimeBetween(courtId, start, end).stream()
-                .map(b -> new BookingResponseDTO(
-                        b.getId(),
-                        b.getUser().getId(),
-                        b.getCourt().getId(),
-                        b.getStartTime(),
-                        b.getEndTime(),
-                        b.getCourtPrice(),
-                        b.getStatus()
-                ))
-                .collect(Collectors.toList());
+    // Preserve cancellation rules and its audit trail instead of physically deleting reservations.
+    public void delete(Long id) {
+        cancel(id);
     }
 
-    public List<BookingResponseDTO> listByUser(Long userId) {
-        return bookingRepository.findAllByUserId(userId).stream()
-                .map(b -> new BookingResponseDTO(
-                        b.getId(),
-                        b.getUser().getId(),
-                        b.getCourt().getId(),
-                        b.getStartTime(),
-                        b.getEndTime(),
-                        b.getCourtPrice(),
-                        b.getStatus()
-                ))
-                .collect(Collectors.toList());
-    }
-
+    @Transactional(readOnly = true)
     public BookingResponseDTO getById(Long id) {
-        Booking b = bookingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+        return response(owned(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponseDTO> listAll() {
+        auth.ensureAdmin();
+        return bookings.findAll().stream().map(this::response).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponseDTO> listByUser(Long id) {
+        auth.ensureOwner(id);
+        return bookings.findAllByUserId(id).stream().map(this::response).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponseDTO> listByDate(LocalDate date) {
+        auth.ensureAdmin();
+        return bookings
+                .findAllByStartTimeBetween(date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+                .stream()
+                .map(this::response)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookingResponseDTO> listByDateAndCourt(LocalDate date, Long court) {
+        auth.ensureAdmin();
+        return bookings
+                .findAllByCourt_IdAndStartTimeBetween(
+                        court, date.atStartOfDay(), date.plusDays(1).atStartOfDay())
+                .stream()
+                .map(this::response)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilityDTO> availability(LocalDate date, Long courtId) {
+        Court court = courts.findById(courtId).orElseThrow(() -> missing("Court"));
+        var occupied = bookings.overlapping(courtId, date.atTime(6, 0), date.atTime(23, 0));
+        var slots = new ArrayList<AvailabilityDTO>();
+        var dayPrices = prices.dayPrices(date);
+        for (int hour = 6; hour < 23; hour++) {
+            var start = date.atTime(hour, 0);
+            var end = start.plusHours(1);
+            boolean free =
+                    court.getStatus() == CourtStatus.ACTIVE
+                            && start.isAfter(now())
+                            && occupied.stream()
+                                    .noneMatch(
+                                            b ->
+                                                    b.getStartTime().isBefore(end)
+                                                            && b.getEndTime().isAfter(start));
+            slots.add(new AvailabilityDTO(courtId, start, end, free, dayPrices.get(hour - 6)));
+        }
+        return slots;
+    }
+
+    private Booking owned(Long id) {
+        Booking b = bookings.findById(id).orElseThrow(() -> missing("Booking"));
+        auth.ensureOwner(b.getUser().getId());
+        return b;
+    }
+
+    private void requireFutureScheduled(Booking b) {
+        if (b.getStatus() != BookingStatus.SCHEDULED || !b.getStartTime().isAfter(now()))
+            throw new IllegalStateException("Only future scheduled bookings can change");
+    }
+
+    private void validateCourt(Court court) {
+        if (court.getStatus() != CourtStatus.ACTIVE)
+            throw new IllegalStateException("Court is inactive");
+    }
+
+    public void validateSlot(LocalDateTime start, LocalDateTime end) {
+        if (start == null || end == null || !end.equals(start.plusHours(1)))
+            throw new IllegalArgumentException(
+                    "End time must be exactly one hour after start time");
+        if (!start.toLocalDate().equals(end.toLocalDate())
+                || start.getHour() < 6
+                || end.toLocalTime().isAfter(LocalTime.of(23, 0))
+                || start.getMinute() != 0
+                || start.getSecond() != 0
+                || start.getNano() != 0)
+            throw new IllegalArgumentException(
+                    "Bookings require whole-hour slots from 06:00 to 23:00");
+        if (!start.isAfter(now()))
+            throw new IllegalArgumentException("Booking must start in the future");
+    }
+
+    private void ensureVacant(Long court, LocalDateTime start, LocalDateTime end, Long exclude) {
+        if (bookings.overlapping(court, start, end).stream()
+                .anyMatch(b -> !Objects.equals(b.getId(), exclude)))
+            throw new IllegalStateException("Court already booked for this interval");
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(clock);
+    }
+
+    private ResponseStatusException missing(String type) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, type + " not found");
+    }
+
+    private BookingResponseDTO response(Booking b) {
         return new BookingResponseDTO(
                 b.getId(),
                 b.getUser().getId(),
@@ -152,158 +248,8 @@ public class BookingService {
                 b.getStartTime(),
                 b.getEndTime(),
                 b.getCourtPrice(),
-                b.getStatus()
-        );
-    }
-
-    public BookingResponseDTO update(Long id, UpdateBookingDTO dto) {
-        Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
-
-        if (dto.userId() != null) {
-            User user = userRepository.findById(dto.userId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            booking.setUser(user);
-        }
-        if (dto.courtId() != null) {
-            Court court = courtRepository.findById(dto.courtId())
-                    .orElseThrow(() -> new RuntimeException("Court not found"));
-            if (court.getStatus().name().equals("INACTIVE")) {
-                throw new RuntimeException("Court is inactive");
-            }
-            booking.setCourt(court);
-        }
-        if (dto.startTime() != null) {
-            booking.setStartTime(dto.startTime());
-        }
-        if (dto.endTime() != null) {
-            booking.setEndTime(dto.endTime());
-        }
-
-        if (!booking.getEndTime().isAfter(booking.getStartTime())) {
-            throw new RuntimeException("End time must be after start time");
-        }
-
-        BigDecimal recalculatedPrice = calculatePrice(booking.getStartTime(), booking.getEndTime(), booking.getCourt());
-        if (recalculatedPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Calculated price must be greater than or equal to zero");
-        }
-        booking.setCourtPrice(recalculatedPrice);
-
-        Booking saved = bookingRepository.save(booking);
-        return new BookingResponseDTO(
-                saved.getId(),
-                saved.getUser().getId(),
-                saved.getCourt().getId(),
-                saved.getStartTime(),
-                saved.getEndTime(),
-                saved.getCourtPrice(),
-                saved.getStatus()
-        );
-    }
-
-    public void delete(Long id) {
-        if (!bookingRepository.existsById(id)) {
-            throw new RuntimeException("Booking not found");
-        }
-        bookingRepository.deleteById(id);
-    }
-
-    public CancellationResponseDTO cancel(Long id) {
-        Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
-
-        if (booking.getStatus() == BookingStatus.CANCELLED) {
-            throw new RuntimeException("Booking already cancelled");
-        }
-        if (booking.getStatus() == BookingStatus.COMPLETED) {
-            throw new RuntimeException("Completed bookings cannot be cancelled");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isAfter(booking.getStartTime())) {
-            throw new RuntimeException("Cannot cancel a booking that has already started");
-        }
-
-        long hoursUntilStart = java.time.Duration.between(now, booking.getStartTime()).toHours();
-        BigDecimal price = booking.getCourtPrice() == null ? BigDecimal.ZERO : booking.getCourtPrice();
-        BigDecimal refund;
-        if (hoursUntilStart >= 24) {
-            refund = price;
-        } else if (hoursUntilStart >= 12) {
-            refund = price.multiply(new BigDecimal("0.5"));
-        } else {
-            refund = BigDecimal.ZERO;
-        }
-
-        booking.setStatus(BookingStatus.CANCELLED);
-        booking.setCancelledAt(now);
-        bookingRepository.save(booking);
-
-        return new CancellationResponseDTO(
-                booking.getId(),
-                refund,
-                booking.getStatus().name(),
-                booking.getCancelledAt()
-        );
-    }
-
-    private static final BigDecimal BASE_PRICE_OPEN = new BigDecimal("100.00");
-    private static final BigDecimal BASE_PRICE_COVERED = new BigDecimal("120.00");
-    private static final int PEAK_START_HOUR = 18;
-    private static final int PEAK_END_HOUR = 22;
-    private static final BigDecimal PEAK_MULTIPLIER = new BigDecimal("1.20");
-
-    private BigDecimal calculatePrice(LocalDateTime start, LocalDateTime end, com.bookings.entity.Court court) {
-        if (start == null || end == null || court == null) {
-            throw new RuntimeException("Invalid data to calculate price");
-        }
-
-        BigDecimal basePerHour = court.getType() != null && court.getType().name().equals("COVERED")
-                ? BASE_PRICE_COVERED
-                : BASE_PRICE_OPEN;
-
-        BigDecimal basePerMinute = basePerHour.divide(new BigDecimal(60), 10, RoundingMode.HALF_UP);
-
-        long totalMinutes = java.time.Duration.between(start, end).toMinutes();
-        if (totalMinutes <= 0) {
-            throw new RuntimeException("End time must be after start time");
-        }
-
-        long peakMinutes = calculatePeakMinutes(start, end);
-        long normalMinutes = totalMinutes - peakMinutes;
-
-        BigDecimal normalPart = basePerMinute.multiply(new BigDecimal(normalMinutes));
-        BigDecimal peakPart = basePerMinute.multiply(PEAK_MULTIPLIER).multiply(new BigDecimal(peakMinutes));
-
-        BigDecimal total = normalPart.add(peakPart).setScale(2, RoundingMode.HALF_UP);
-        return total.max(BigDecimal.ZERO);
-    }
-
-    private long calculatePeakMinutes(LocalDateTime start, LocalDateTime end) {
-        long minutes = 0;
-
-        LocalDateTime cursor = start;
-        while (cursor.isBefore(end)) {
-            LocalDate day = cursor.toLocalDate();
-            LocalDateTime peakStart = LocalDateTime.of(day, LocalTime.of(PEAK_START_HOUR, 0));
-            LocalDateTime peakEnd = LocalDateTime.of(day, LocalTime.of(PEAK_END_HOUR, 0));
-
-            LocalDateTime sliceStart = max(cursor, peakStart);
-            LocalDateTime sliceEnd = min(end, peakEnd);
-            long m = Math.max(0, java.time.Duration.between(sliceStart, sliceEnd).toMinutes());
-            minutes += m;
-
-            cursor = LocalDateTime.of(day.plusDays(1), LocalTime.MIDNIGHT);
-        }
-        return minutes;
-    }
-
-    private static LocalDateTime max(LocalDateTime a, LocalDateTime b) {
-        return a.isAfter(b) ? a : b;
-    }
-
-    private static LocalDateTime min(LocalDateTime a, LocalDateTime b) {
-        return a.isBefore(b) ? a : b;
+                b.getCreditUsed(),
+                b.getCourtPrice().subtract(b.getCreditUsed()),
+                b.getStatus());
     }
 }

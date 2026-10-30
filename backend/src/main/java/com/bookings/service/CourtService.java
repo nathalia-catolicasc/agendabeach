@@ -6,7 +6,9 @@ import com.bookings.dto.UpdateCourtDTO;
 import com.bookings.entity.Court;
 import com.bookings.enums.CourtStatus;
 import com.bookings.repository.CourtRepository;
+
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,11 +29,7 @@ public class CourtService {
 
         Court saved = courtRepository.save(court);
         return new CourtResponseDTO(
-                saved.getId(),
-                saved.getName(),
-                saved.getType(),
-                saved.getStatus()
-        );
+                saved.getId(), saved.getName(), saved.getType(), saved.getStatus());
     }
 
     public List<CourtResponseDTO> listAll() {
@@ -41,12 +39,19 @@ public class CourtService {
     }
 
     public CourtResponseDTO getById(Long id) {
-        Court c = courtRepository.findById(id).orElseThrow(() -> new RuntimeException("Court not found"));
+        Court c =
+                courtRepository
+                        .findById(id)
+                        .orElseThrow(() -> new RuntimeException("Court not found"));
         return new CourtResponseDTO(c.getId(), c.getName(), c.getType(), c.getStatus());
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public CourtResponseDTO update(Long id, UpdateCourtDTO dto) {
-        Court court = courtRepository.findById(id).orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court =
+                courtRepository
+                        .lockById(id)
+                        .orElseThrow(() -> new RuntimeException("Court not found"));
         if (dto.name() != null && !dto.name().isBlank()) {
             court.setName(dto.name());
         }
@@ -57,7 +62,8 @@ public class CourtService {
             court.setStatus(dto.status());
         }
         Court saved = courtRepository.save(court);
-        return new CourtResponseDTO(saved.getId(), saved.getName(), saved.getType(), saved.getStatus());
+        return new CourtResponseDTO(
+                saved.getId(), saved.getName(), saved.getType(), saved.getStatus());
     }
 
     public void delete(Long id) {

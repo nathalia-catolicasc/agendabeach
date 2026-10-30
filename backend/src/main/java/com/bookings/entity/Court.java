@@ -1,7 +1,12 @@
 package com.bookings.entity;
 
-import jakarta.persistence.*;
 import com.bookings.enums.*;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,11 +21,13 @@ public class Court {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "court_type")
     private CourtType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "court_status")
     private CourtStatus status;
 
     @Column(name = "created_at", nullable = false)

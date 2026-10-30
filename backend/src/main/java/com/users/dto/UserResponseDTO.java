@@ -1,8 +1,5 @@
 package com.users.dto;
 
-public record UserResponseDTO(
-        Long id,
-        String name,
-        String email
-) {
-}
+import com.users.enums.ProfileType;
+
+public record UserResponseDTO(Long id, String name, String email, ProfileType profile) {}
