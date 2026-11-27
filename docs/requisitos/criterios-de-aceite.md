@@ -118,6 +118,6 @@ Situação na base `1baf6c3`. "—" indica teste a criar (ver seção 6.3 do rel
 | CA-RF01.1, CA-RF01.2    | Teste de tela da `BookingPage` com sessão CLIENT                      | —             |
 | CA-RF02.2               | Teste de tela de uso de crédito                                       | —             |
 | CA-RF04.3               | `AgendaBeachApplicationTests.secureIdentityOwnershipRolesAndTokenExpiry` | Existe       |
-| CA-RNF01.1              | Script k6                                                             | —             |
+| CA-RNF01.1              | `perf/availability.js` (k6, job `performance` do CI)                  | Existe        |
 | CA-RNF02.1              | `AgendaBeachApplicationTests` (mesma vaga e cancelamento simultâneo)  | Existe        |
 | CA-RNF04.1              | `AgendaBeachApplicationTests.cpfAndOpenApi`                           | Existe        |
