@@ -92,7 +92,39 @@ jobs:
         run: docker build -t agendabeach-frontend:ci ./frontend
 
   # ----------------------------------------------------------
-  # 6. Check-up de qualidade (SonarCloud)
+  # 6. Teste de carga (RNF01): p95 da grade < 2 s com 50 usuários
+  # ----------------------------------------------------------
+  performance:
+    name: Desempenho · k6 (RNF01)
+    runs-on: ubuntu-latest
+    needs: [backend-image]
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Subir o banco e o backend (espera o healthcheck)
+        run: docker compose up -d --build --wait --wait-timeout 180 db backend
+
+      - name: Cadastrar a quadra usada no teste
+        run: docker compose exec -T db psql -U postgres -d agendabeach -v ON_ERROR_STOP=1 < perf/seed.sql
+
+      - name: Rodar o k6 (falha se p95 >= 2 s)
+        run: |
+          docker run --rm --network host \
+            -v "$PWD/perf:/perf:ro" \
+            -e BASE_URL=http://localhost:8080 \
+            grafana/k6:2.3.0 run /perf/availability.js
+
+      - name: Logs do backend (só se falhar)
+        if: failure()
+        run: docker compose logs backend
+
+      - name: Encerrar os containers
+        if: always()
+        run: docker compose down -v
+
+  # ----------------------------------------------------------
+  # 7. Check-up de qualidade (SonarCloud)
   # ----------------------------------------------------------
   # Configuração da análise: sonar-project.properties (raiz do repositório).
   # Pré-requisitos no SonarCloud/GitHub:
