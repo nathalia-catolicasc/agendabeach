@@ -73,7 +73,8 @@ Criação de reserva:
 
 - RN01: exatamente uma hora, com início em hora cheia entre 06:00 e 22:00, encerrando até 23:00, em quadra ativa e no futuro. A grade contém 17 intervalos, sem nomes ou IDs de clientes.
 - RN02: R$ 60,00 em dias úteis, das 06:00 até antes das 17:00; R$ 100,00 a partir das 17:00, nos finais de semana e feriados. O tipo de quadra não altera a tarifa. `PUT /pricing` recebe `regularPrice` e `peakPrice`; alterações afetam apenas novas reservas.
-- Feriados nacionais de data fixa são reconhecidos automaticamente (01/01, 21/04, 01/05, 07/09, 12/10, 02/11, 15/11, 20/11 e 25/12). Cadastre feriados móveis, estaduais e municipais conforme o calendário do estabelecimento com `PUT /pricing/holidays`, por exemplo `{"date":"2027-03-26","description":"Sexta-feira Santa"}`. O backend não depende de serviço externo de calendário.
+- Feriados nacionais são reconhecidos automaticamente: os de data fixa (01/01, 21/04, 01/05, 07/09, 12/10, 02/11, 15/11, 20/11 e 25/12) e os móveis Sexta-feira Santa (Páscoa − 2 dias) e Corpus Christi (Páscoa + 60 dias), calculados a partir da Páscoa. Cadastre feriados estaduais e municipais com `PUT /pricing/holidays`, por exemplo `{"date":"2027-01-09","description":"Aniversário da cidade"}`. O backend não depende de serviço externo de calendário.
+- A grade (`GET /bookings/availability`) e a cobrança usam a mesma regra de preço (`PricingService.rate`), então o valor exibido é o valor cobrado.
 - RN03/RNF02: transações e locks de quadra protegem a reserva; a exclusão GiST/TSRANGE do PostgreSQL continua como última proteção contra sobreposição.
 - RN05: no máximo três reservas SCHEDULED com início futuro por CPF. CPF único e lock de usuário protegem esse limite mesmo em solicitações simultâneas para quadras diferentes. Reservas canceladas ou passadas não consomem o limite.
 - Datas da API representam o horário local do estabelecimento, `America/Sao_Paulo`. O cálculo usa um `Clock` injetável, sem depender do fuso do sistema operacional.
@@ -88,11 +89,18 @@ Criação de reserva:
 | De 2 até 24 horas, inclusive | Zero | 50% do preço total |
 | Menor que 2 horas, antes do início | Zero | Zero |
 
-Após o início, ou quando já cancelada/concluída, a reserva não pode ser cancelada novamente. A resposta separa `refundAmount` e `creditAmount`. Valores e momento do cancelamento ficam registrados na reserva e o saldo é persistido no usuário. Cancelamento e saldo mudam na mesma transação, com locks que evitam crédito duplicado ou perda de saldo. Valores são arredondados para centavos.
+Toda resposta de reserva traz `cancellationPolicy`, calculada pela mesma regra do cancelamento: `type` (`REFUND`, `CREDIT` ou `NONE`), `percentage`, `refundAmount` e `creditAmount` se cancelar agora, além de `refundDeadline` (24h antes) e `creditDeadline` (2h antes). O frontend exibe esses valores em vez de recalcular a regra. O campo vem `null` quando a reserva não pode mais ser cancelada.
+
+Após o início, ou quando já cancelada/concluída, a reserva não pode ser cancelada novamente. O cancelamento é feito por `POST /bookings/{id}/cancel` (a rota duplicada `/bookings/api/bookings/{id}/cancel` foi removida). A resposta separa `refundAmount` e `creditAmount`. Valores e momento do cancelamento ficam registrados na reserva e o saldo é persistido no usuário. Cancelamento e saldo mudam na mesma transação, com locks que evitam crédito duplicado ou perda de saldo. Valores são arredondados para centavos.
 
 O projeto não possui integração com meios de pagamento. `refundAmount` registra o valor de reembolso devido; não executa transferência bancária ou estorno em operadora. O crédito interno já pode ser utilizado em reservas futuras.
 
-Erros de entrada retornam 400; autenticação ausente/inválida, 401; falta de permissão, 403; recurso inexistente na reserva, 404; conflitos de horário, CPF, limite ou estado, 409.
+Erros seguem o formato `ProblemDetail`, com `detail` em português pronto para exibição: entrada inválida (inclusive validação de campos e JSON mal formatado), 400; autenticação ausente/inválida, 401; falta de permissão, 403; usuário, quadra ou reserva inexistente, 404; conflitos de horário, CPF, limite ou estado, 409; excesso de tentativas de login, 429.
+
+## Sessão e login
+
+- Tokens valem 8 horas. Uma tarefa agendada apaga diariamente, às 03:00 (horário de Brasília), os tokens expirados de `auth_tokens`. O horário pode ser alterado com a propriedade `agendabeach.auth.token-cleanup-cron`.
+- Após 5 senhas erradas para o mesmo e-mail em 15 minutos, o login desse e-mail fica bloqueado por 15 minutos (HTTP 429). Um login correto zera a contagem. O controle é em memória, adequado a uma instância da API.
 
 ## Testes
 
@@ -106,7 +114,7 @@ bash mvnw package
 Sem banco, execute somente os testes unitários:
 
 ```sh
-bash mvnw -Dtest=UserServiceTest,BookingServiceTest,BookingRulesTest,PricingServiceTest,CpfValidatorTest test
+bash mvnw '-Dtest=!AgendaBeachApplicationTests' -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 A integração usa o PostgreSQL configurado nas variáveis `SPRING_DATASOURCE_*`, com defaults locais de desenvolvimento. Ela cria e limpa **somente o schema reservado `agendabeach_backend_test`** e um schema temporário `legacy_upgrade_test`; use banco de desenvolvimento/testes com permissão de criação de schemas. Não execute essa suíte contra produção. As tabelas normais de desenvolvimento no schema `public` ficam preservadas.

@@ -4,55 +4,64 @@ import com.bookings.dto.BookingResponseDTO;
 import com.bookings.service.BookingService;
 import com.users.dto.CreateUserDTO;
 import com.users.dto.LoginDTO;
+import com.users.dto.LoginResponseDTO;
 import com.users.dto.UpdateUserDTO;
 import com.users.dto.UserResponseDTO;
+import com.users.service.AuthService;
+import com.users.service.TokenService;
 import com.users.service.UserService;
+
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+
+import jakarta.validation.Valid;
 
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
+    private static final String BEARER_PREFIX = "Bearer ";
 
-    private final com.users.service.AuthService auth;
-    private final com.users.service.TokenService tokens;
+    private final AuthService auth;
+    private final TokenService tokens;
     private final UserService userService;
     private final BookingService bookingService;
 
     public UserController(
             UserService userService,
             BookingService bookingService,
-            com.users.service.AuthService auth,
-            com.users.service.TokenService tokens) {
+            AuthService auth,
+            TokenService tokens) {
         this.auth = auth;
         this.tokens = tokens;
         this.userService = userService;
         this.bookingService = bookingService;
     }
 
-    @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    @SecurityRequirements
     @PostMapping
-    public UserResponseDTO create(@jakarta.validation.Valid @RequestBody CreateUserDTO dto) {
+    public UserResponseDTO create(@Valid @RequestBody CreateUserDTO dto) {
         return userService.create(dto);
     }
 
-    @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    @SecurityRequirements
     @PostMapping("/login")
-    public com.users.dto.LoginResponseDTO login(
-            @jakarta.validation.Valid @RequestBody LoginDTO dto) {
+    public LoginResponseDTO login(@Valid @RequestBody LoginDTO dto) {
         return tokens.login(dto);
     }
 
     @PostMapping("/logout")
     public void logout(@RequestHeader("Authorization") String header) {
-        tokens.logout(header.substring(7));
+        tokens.logout(header.substring(BEARER_PREFIX.length()));
     }
 
     @GetMapping("/me/credits")
-    public java.util.Map<String, java.math.BigDecimal> credits() {
-        return java.util.Map.of("creditBalance", auth.current().getCreditBalance());
+    public Map<String, BigDecimal> credits() {
+        return Map.of("creditBalance", auth.current().getCreditBalance());
     }
 
     @GetMapping
@@ -68,8 +77,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public UserResponseDTO update(
-            @PathVariable Long id, @jakarta.validation.Valid @RequestBody UpdateUserDTO dto) {
+    public UserResponseDTO update(@PathVariable Long id, @Valid @RequestBody UpdateUserDTO dto) {
         auth.ensureOwner(id);
         return userService.update(id, dto);
     }

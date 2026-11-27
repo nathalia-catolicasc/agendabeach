@@ -3,7 +3,7 @@ import { AppHeader, ConfirmDialog, PageHeading } from './components'
 import { getNavigationItems } from './navigation'
 import { ApiError, cancelBooking, listBookings, listCourts, listUserBookings, listUsers } from './api'
 import type { ApiUser, Booking, Cancellation, Court } from './api'
-import { canTryAdmin, getInitials } from './session'
+import { isAdmin, getInitials } from './session'
 import type { SessionUser } from './session'
 import {
   formatCurrency,
@@ -26,7 +26,7 @@ type CancelBookingPageProps = {
 type Scope = 'mine' | 'all'
 
 export default function CancelBookingPage({ user, onNavigate, onLogout }: CancelBookingPageProps) {
-  const isAdminUser = canTryAdmin(user)
+  const isAdminUser = isAdmin(user)
 
   const [scope, setScope] = useState<Scope>('mine')
   const [bookings, setBookings] = useState<Booking[]>([])

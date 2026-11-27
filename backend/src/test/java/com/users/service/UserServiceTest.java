@@ -30,8 +30,8 @@ import java.util.Optional;
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
-    private static final String INVALID_CREDENTIALS_MSG = "Invalid email or password";
-    private static final String NOT_FOUND_MSG = "User not found";
+    private static final String INVALID_CREDENTIALS_MSG = UserService.INVALID_CREDENTIALS;
+    private static final String NOT_FOUND_MSG = UserService.USER_NOT_FOUND;
 
     @Mock private UserRepository userRepository;
 
@@ -173,9 +173,11 @@ class UserServiceTest {
     void getById_ShouldThrow_WhenNotFound() {
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.getById(1L));
+        ResponseStatusException ex =
+                assertThrows(ResponseStatusException.class, () -> userService.getById(1L));
 
-        assertEquals(NOT_FOUND_MSG, ex.getMessage());
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals(NOT_FOUND_MSG, ex.getReason());
     }
 
     @Test
@@ -238,12 +240,13 @@ class UserServiceTest {
     void update_ShouldThrow_WhenUserNotFound() {
         when(userRepository.lockById(99L)).thenReturn(Optional.empty());
 
-        RuntimeException ex =
+        ResponseStatusException ex =
                 assertThrows(
-                        RuntimeException.class,
+                        ResponseStatusException.class,
                         () -> userService.update(99L, new UpdateUserDTO("Ana", null, null, null)));
 
-        assertEquals(NOT_FOUND_MSG, ex.getMessage());
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals(NOT_FOUND_MSG, ex.getReason());
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -258,9 +261,11 @@ class UserServiceTest {
     void delete_ShouldThrow_WhenUserNotFound() {
         when(userRepository.existsById(99L)).thenReturn(false);
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.delete(99L));
+        ResponseStatusException ex =
+                assertThrows(ResponseStatusException.class, () -> userService.delete(99L));
 
-        assertEquals(NOT_FOUND_MSG, ex.getMessage());
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        assertEquals(NOT_FOUND_MSG, ex.getReason());
         verify(userRepository, never()).deleteById(anyLong());
     }
 }

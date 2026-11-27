@@ -5,8 +5,9 @@ import com.bookings.dto.CreateCourtDTO;
 import com.bookings.dto.UpdateCourtDTO;
 import com.bookings.service.CourtService;
 import com.users.service.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -22,8 +23,8 @@ public class CourtController {
     }
 
     @PostMapping
-    public CourtResponseDTO create(@RequestBody CreateCourtDTO dto, HttpServletRequest request) {
-        authService.ensureAdmin(request);
+    public CourtResponseDTO create(@RequestBody CreateCourtDTO dto) {
+        authService.ensureAdmin();
         return courtService.create(dto);
     }
 
@@ -38,14 +39,14 @@ public class CourtController {
     }
 
     @PutMapping("/{id}")
-    public CourtResponseDTO update(@PathVariable Long id, @RequestBody UpdateCourtDTO dto, HttpServletRequest request) {
-        authService.ensureAdmin(request);
+    public CourtResponseDTO update(@PathVariable Long id, @RequestBody UpdateCourtDTO dto) {
+        authService.ensureAdmin();
         return courtService.update(id, dto);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id, HttpServletRequest request) {
-        authService.ensureAdmin(request);
+    public void delete(@PathVariable Long id) {
+        authService.ensureAdmin();
         courtService.delete(id);
     }
 }

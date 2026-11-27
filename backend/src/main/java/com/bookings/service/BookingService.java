@@ -1,5 +1,7 @@
 package com.bookings.service;
 
+import static com.bookings.service.BusinessHours.*;
+
 import com.bookings.dto.*;
 import com.bookings.entity.*;
 import com.bookings.enums.*;
@@ -20,6 +22,19 @@ import java.util.*;
 @Service
 @Transactional
 public class BookingService {
+    static final String USER_NOT_FOUND = "Usuário não encontrado";
+    static final String COURT_NOT_FOUND = "Quadra não encontrada";
+    static final String BOOKING_NOT_FOUND = "Reserva não encontrada";
+    static final String COURT_INACTIVE = "Quadra inativa";
+    static final String NOT_CHANGEABLE = "Apenas reservas futuras e agendadas podem ser alteradas";
+    static final String INVALID_DURATION = "A reserva deve ter exatamente 1 hora de duração";
+
+    private static final int MAX_FUTURE_BOOKINGS = 3;
+    private static final Duration FULL_REFUND_NOTICE = Duration.ofHours(24);
+    private static final Duration CREDIT_NOTICE = Duration.ofHours(2);
+    private static final BigDecimal CREDIT_RATE = new BigDecimal("0.50");
+    private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
+
     private final BookingRepository bookings;
     private final UserRepository users;
     private final CourtRepository courts;
@@ -47,13 +62,14 @@ public class BookingService {
         if (dto.userId() != null && !dto.userId().equals(current)) auth.ensureAdmin();
         Long userId = dto.userId() == null ? current : dto.userId();
         // The user lock serializes the quota and wallet across different courts and API instances.
-        User user = users.lockById(userId).orElseThrow(() -> missing("User"));
+        User user = users.lockById(userId).orElseThrow(() -> missing(USER_NOT_FOUND));
         if (user.getCpf() == null)
-            throw new IllegalStateException("Register a valid CPF before booking");
+            throw new IllegalStateException("Cadastre um CPF válido antes de reservar");
         validateSlot(dto.startTime(), dto.endTime());
         if (bookings.countByUserIdAndStatusAndStartTimeAfter(userId, BookingStatus.SCHEDULED, now())
-                >= 3) throw new IllegalStateException("Maximum of three future bookings per CPF");
-        Court court = courts.lockById(dto.courtId()).orElseThrow(() -> missing("Court"));
+                >= MAX_FUTURE_BOOKINGS)
+            throw new IllegalStateException("Limite de três reservas futuras por CPF atingido");
+        Court court = courts.lockById(dto.courtId()).orElseThrow(() -> missing(COURT_NOT_FOUND));
         validateCourt(court);
         ensureVacant(court.getId(), dto.startTime(), dto.endTime(), null);
         Booking booking = new Booking();
@@ -74,59 +90,56 @@ public class BookingService {
     }
 
     public BookingResponseDTO update(Long id, UpdateBookingDTO dto) {
-        Long owner = bookings.ownerId(id).orElseThrow(() -> missing("Booking"));
+        Long owner = bookings.ownerId(id).orElseThrow(() -> missing(BOOKING_NOT_FOUND));
         auth.ensureOwner(owner);
-        User user = users.lockById(owner).orElseThrow();
-        Booking b = bookings.lockById(id).orElseThrow(() -> missing("Booking"));
-        requireFutureScheduled(b);
-        if (Duration.between(now(), b.getStartTime()).compareTo(Duration.ofHours(24)) <= 0)
+        User user = users.lockById(owner).orElseThrow(() -> missing(USER_NOT_FOUND));
+        Booking booking = bookings.lockById(id).orElseThrow(() -> missing(BOOKING_NOT_FOUND));
+        requireFutureScheduled(booking);
+        if (Duration.between(now(), booking.getStartTime()).compareTo(FULL_REFUND_NOTICE) <= 0)
             throw new IllegalStateException(
-                    "Rescheduling requires more than 24 hours notice; cancel and rebook");
+                    "Remarcação exige mais de 24 horas de antecedência; cancele e faça uma nova"
+                            + " reserva");
         if (dto.userId() != null && !dto.userId().equals(user.getId()))
-            throw new IllegalArgumentException("Booking owner cannot change");
-        if (b.getCreditUsed().signum() != 0)
-            throw new IllegalStateException("Cancel and rebook reservations paid with credit");
-        LocalDateTime start = dto.startTime() == null ? b.getStartTime() : dto.startTime();
-        LocalDateTime end = dto.endTime() == null ? b.getEndTime() : dto.endTime();
+            throw new IllegalArgumentException("O titular da reserva não pode ser alterado");
+        if (booking.getCreditUsed().signum() != 0)
+            throw new IllegalStateException(
+                    "Reservas pagas com crédito não podem ser remarcadas; cancele e faça uma nova"
+                            + " reserva");
+        LocalDateTime start = dto.startTime() == null ? booking.getStartTime() : dto.startTime();
+        LocalDateTime end = dto.endTime() == null ? booking.getEndTime() : dto.endTime();
         validateSlot(start, end);
-        Long courtId = dto.courtId() == null ? b.getCourt().getId() : dto.courtId();
-        Court court = courts.lockById(courtId).orElseThrow(() -> missing("Court"));
+        Long courtId = dto.courtId() == null ? booking.getCourt().getId() : dto.courtId();
+        Court court = courts.lockById(courtId).orElseThrow(() -> missing(COURT_NOT_FOUND));
         validateCourt(court);
         ensureVacant(courtId, start, end, id);
-        if (prices.price(start).compareTo(b.getCourtPrice()) != 0)
-            throw new IllegalStateException("Price changes require cancellation and a new booking");
-        b.setCourt(court);
-        b.setStartTime(start);
-        b.setEndTime(end);
-        return response(bookings.saveAndFlush(b));
+        if (prices.price(start).compareTo(booking.getCourtPrice()) != 0)
+            throw new IllegalStateException(
+                    "O novo horário tem outro preço; cancele e faça uma nova reserva");
+        booking.setCourt(court);
+        booking.setStartTime(start);
+        booking.setEndTime(end);
+        return response(bookings.saveAndFlush(booking));
     }
 
     public CancellationResponseDTO cancel(Long id) {
-        Long owner = bookings.ownerId(id).orElseThrow(() -> missing("Booking"));
+        Long owner = bookings.ownerId(id).orElseThrow(() -> missing(BOOKING_NOT_FOUND));
         auth.ensureOwner(owner);
-        User user = users.lockById(owner).orElseThrow();
-        Booking b = bookings.lockById(id).orElseThrow(() -> missing("Booking"));
-        requireFutureScheduled(b);
-        Duration remaining = Duration.between(now(), b.getStartTime());
-        BigDecimal refund = BigDecimal.ZERO.setScale(2);
-        BigDecimal credit = BigDecimal.ZERO.setScale(2);
-        if (remaining.compareTo(Duration.ofHours(24)) > 0) {
-            refund = b.getCourtPrice().subtract(b.getCreditUsed());
-            credit = b.getCreditUsed().setScale(2);
-        } else if (remaining.compareTo(Duration.ofHours(2)) >= 0) {
-            credit =
-                    b.getCourtPrice()
-                            .multiply(new BigDecimal("0.50"))
-                            .setScale(2, RoundingMode.HALF_UP);
-        }
-        b.setRefundAmount(refund);
-        b.setCancellationCredit(credit);
-        user.setCreditBalance(user.getCreditBalance().add(credit));
-        b.setStatus(BookingStatus.CANCELLED);
-        b.setCancelledAt(now());
-        bookings.saveAndFlush(b);
+        User user = users.lockById(owner).orElseThrow(() -> missing(USER_NOT_FOUND));
+        Booking booking = bookings.lockById(id).orElseThrow(() -> missing(BOOKING_NOT_FOUND));
+        requireFutureScheduled(booking);
+        CancellationPolicyDTO policy = cancellationPolicy(booking);
+        booking.setRefundAmount(policy.refundAmount());
+        booking.setCancellationCredit(policy.creditAmount());
+        user.setCreditBalance(user.getCreditBalance().add(policy.creditAmount()));
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setCancelledAt(now());
+        bookings.saveAndFlush(booking);
         return new CancellationResponseDTO(
-                id, refund, credit, b.getStatus().name(), b.getCancelledAt());
+                id,
+                policy.refundAmount(),
+                policy.creditAmount(),
+                booking.getStatus().name(),
+                booking.getCancelledAt());
     }
 
     // Preserve cancellation rules and its audit trail instead of physically deleting reservations.
@@ -174,11 +187,13 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<AvailabilityDTO> availability(LocalDate date, Long courtId) {
-        Court court = courts.findById(courtId).orElseThrow(() -> missing("Court"));
-        var occupied = bookings.overlapping(courtId, date.atTime(6, 0), date.atTime(23, 0));
+        Court court = courts.findById(courtId).orElseThrow(() -> missing(COURT_NOT_FOUND));
+        var occupied =
+                bookings.overlapping(
+                        courtId, date.atTime(OPENING_HOUR, 0), date.atTime(CLOSING_HOUR, 0));
         var slots = new ArrayList<AvailabilityDTO>();
         var dayPrices = prices.dayPrices(date);
-        for (int hour = 6; hour < 23; hour++) {
+        for (int hour = OPENING_HOUR; hour < CLOSING_HOUR; hour++) {
             var start = date.atTime(hour, 0);
             var end = start.plusHours(1);
             boolean free =
@@ -186,70 +201,103 @@ public class BookingService {
                             && start.isAfter(now())
                             && occupied.stream()
                                     .noneMatch(
-                                            b ->
-                                                    b.getStartTime().isBefore(end)
-                                                            && b.getEndTime().isAfter(start));
-            slots.add(new AvailabilityDTO(courtId, start, end, free, dayPrices.get(hour - 6)));
+                                            other ->
+                                                    other.getStartTime().isBefore(end)
+                                                            && other.getEndTime().isAfter(start));
+            slots.add(
+                    new AvailabilityDTO(
+                            courtId, start, end, free, dayPrices.get(hour - OPENING_HOUR)));
         }
         return slots;
     }
 
-    private Booking owned(Long id) {
-        Booking b = bookings.findById(id).orElseThrow(() -> missing("Booking"));
-        auth.ensureOwner(b.getUser().getId());
-        return b;
+    /**
+     * RN04: mais de 24h devolve tudo (dinheiro e o crédito usado); de 24h até 2h devolve 50% em
+     * crédito; menos de 2h não devolve nada. É a mesma regra usada em {@link #cancel(Long)}.
+     */
+    private CancellationPolicyDTO cancellationPolicy(Booking booking) {
+        Duration remaining = Duration.between(now(), booking.getStartTime());
+        LocalDateTime refundDeadline = booking.getStartTime().minus(FULL_REFUND_NOTICE);
+        LocalDateTime creditDeadline = booking.getStartTime().minus(CREDIT_NOTICE);
+        if (remaining.compareTo(FULL_REFUND_NOTICE) > 0)
+            return new CancellationPolicyDTO(
+                    CancellationType.REFUND,
+                    new BigDecimal("100"),
+                    booking.getCourtPrice().subtract(booking.getCreditUsed()),
+                    booking.getCreditUsed().setScale(2),
+                    refundDeadline,
+                    creditDeadline);
+        if (remaining.compareTo(CREDIT_NOTICE) >= 0)
+            return new CancellationPolicyDTO(
+                    CancellationType.CREDIT,
+                    new BigDecimal("50"),
+                    ZERO,
+                    booking.getCourtPrice().multiply(CREDIT_RATE).setScale(2, RoundingMode.HALF_UP),
+                    refundDeadline,
+                    creditDeadline);
+        return new CancellationPolicyDTO(
+                CancellationType.NONE, BigDecimal.ZERO, ZERO, ZERO, refundDeadline, creditDeadline);
     }
 
-    private void requireFutureScheduled(Booking b) {
-        if (b.getStatus() != BookingStatus.SCHEDULED || !b.getStartTime().isAfter(now()))
-            throw new IllegalStateException("Only future scheduled bookings can change");
+    private Booking owned(Long id) {
+        Booking booking = bookings.findById(id).orElseThrow(() -> missing(BOOKING_NOT_FOUND));
+        auth.ensureOwner(booking.getUser().getId());
+        return booking;
+    }
+
+    private boolean isFutureScheduled(Booking booking) {
+        return booking.getStatus() == BookingStatus.SCHEDULED
+                && booking.getStartTime().isAfter(now());
+    }
+
+    private void requireFutureScheduled(Booking booking) {
+        if (!isFutureScheduled(booking)) throw new IllegalStateException(NOT_CHANGEABLE);
     }
 
     private void validateCourt(Court court) {
-        if (court.getStatus() != CourtStatus.ACTIVE)
-            throw new IllegalStateException("Court is inactive");
+        if (court.getStatus() != CourtStatus.ACTIVE) throw new IllegalStateException(COURT_INACTIVE);
     }
 
     public void validateSlot(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null || !end.equals(start.plusHours(1)))
-            throw new IllegalArgumentException(
-                    "End time must be exactly one hour after start time");
+            throw new IllegalArgumentException(INVALID_DURATION);
         if (!start.toLocalDate().equals(end.toLocalDate())
-                || start.getHour() < 6
-                || end.toLocalTime().isAfter(LocalTime.of(23, 0))
+                || start.getHour() < OPENING_HOUR
+                || end.toLocalTime().isAfter(LocalTime.of(CLOSING_HOUR, 0))
                 || start.getMinute() != 0
                 || start.getSecond() != 0
                 || start.getNano() != 0)
             throw new IllegalArgumentException(
-                    "Bookings require whole-hour slots from 06:00 to 23:00");
+                    "Reservas devem ocupar horários cheios entre 06:00 e 23:00");
         if (!start.isAfter(now()))
-            throw new IllegalArgumentException("Booking must start in the future");
+            throw new IllegalArgumentException("A reserva deve começar no futuro");
     }
 
     private void ensureVacant(Long court, LocalDateTime start, LocalDateTime end, Long exclude) {
         if (bookings.overlapping(court, start, end).stream()
-                .anyMatch(b -> !Objects.equals(b.getId(), exclude)))
-            throw new IllegalStateException("Court already booked for this interval");
+                .anyMatch(other -> !Objects.equals(other.getId(), exclude)))
+            throw new IllegalStateException("Quadra já reservada neste horário");
     }
 
     private LocalDateTime now() {
         return LocalDateTime.now(clock);
     }
 
-    private ResponseStatusException missing(String type) {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, type + " not found");
+    private static ResponseStatusException missing(String message) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, message);
     }
 
-    private BookingResponseDTO response(Booking b) {
+    private BookingResponseDTO response(Booking booking) {
         return new BookingResponseDTO(
-                b.getId(),
-                b.getUser().getId(),
-                b.getCourt().getId(),
-                b.getStartTime(),
-                b.getEndTime(),
-                b.getCourtPrice(),
-                b.getCreditUsed(),
-                b.getCourtPrice().subtract(b.getCreditUsed()),
-                b.getStatus());
+                booking.getId(),
+                booking.getUser().getId(),
+                booking.getCourt().getId(),
+                booking.getStartTime(),
+                booking.getEndTime(),
+                booking.getCourtPrice(),
+                booking.getCreditUsed(),
+                booking.getCourtPrice().subtract(booking.getCreditUsed()),
+                booking.getStatus(),
+                isFutureScheduled(booking) ? cancellationPolicy(booking) : null);
     }
 }
