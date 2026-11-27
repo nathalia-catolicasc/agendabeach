@@ -35,7 +35,8 @@ services:
       context: ./backend
       target: build
     container_name: agendabeach-backend-unit-tests
-    entrypoint: ["mvn", "-B", "-Dtest=UserServiceTest,BookingServiceTest", "test"]
+    # "*Test" pega todas as classes unitárias; AgendaBeachApplicationTests (integração) fica de fora
+    entrypoint: ["mvn", "-B", "-Dtest=*Test", "test"]
     profiles: ["test"]
 
   backend-integration-tests:
