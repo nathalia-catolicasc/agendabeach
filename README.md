@@ -168,7 +168,7 @@ Sem uma ferramenta paga de gestão, o fluxo do time roda 100% dentro do GitHub:
 5. Abrir o Pull Request para `dev`, referenciando a Issue no corpo (`Closes #12`) — fecha a Issue automaticamente ao mesclar.
 6. **Code Review obrigatório** de ao menos 1 outro dev/QA — o autor não mescla o próprio PR sem aprovação registrada. O [modelo de PR](.github/PULL_REQUEST_TEMPLATE.md) traz o checklist do DoD.
 7. Validação de QA conforme o [DoD](#-definition-of-done-dod).
-8. Merge na `dev` só com CI verde (compilação, testes unitários, testes de integração, build das imagens e SonarCloud) e sem conflitos.
+8. Merge na `dev` só com CI verde (compilação, testes unitários, testes de integração, build das imagens, teste de carga e SonarCloud) e sem conflitos.
 9. Branch deletada após o merge; card movido para `Concluído` no Project.
 
 ## 🎨 Guia de Estilo e Padrões de Código
@@ -272,6 +272,21 @@ npx prettier --check "src/**/*.{ts,tsx,css}"
 npm run build
 ```
 
+### Desempenho (k6)
+
+O RNF01 é medido pelo script [`perf/availability.js`](perf/availability.js): **50 usuários virtuais por 1 minuto**
+consultando `GET /bookings/availability`. O teste falha se o **p95 passar de 2 s**, se mais de 1% das
+requisições derem erro ou se a grade não vier com os 17 horários da RN01. Roda no CI (job `performance`) e
+localmente com:
+
+```bash
+docker compose up -d --build --wait db backend
+docker compose exec -T db psql -U postgres -d agendabeach < perf/seed.sql   # cria a quadra do teste
+docker run --rm --network host -v "$PWD/perf:/perf:ro" grafana/k6:2.3.0 run /perf/availability.js
+```
+
+> No Windows/macOS, `--network host` não alcança o host: troque por `-e BASE_URL=http://host.docker.internal:8080`.
+
 ### Critérios de aceite
 
 Os critérios **Dado / Quando / Então** de cada RN, RF e RNF, com a rastreabilidade para os testes, estão em [docs/requisitos/criterios-de-aceite.md](docs/requisitos/criterios-de-aceite.md).
@@ -296,6 +311,7 @@ Pipeline 100% baseado em **Docker**, definido em `.github/workflows/ci.yml`, dis
 | `backend-unit-tests`        | Roda os testes unitários (Mockito, sem banco) em container                   | `backend-compile` |
 | `backend-integration-tests` | Sobe um PostgreSQL real via Docker Compose e roda o teste de contexto Spring | `backend-compile` |
 | `backend-image`             | Builda a imagem final de produção do backend                                 | testes acima      |
+| `performance`               | Sobe banco + backend e roda o k6: falha se o p95 da grade passar de 2 s      | `backend-image`   |
 | `frontend`                  | Builda a imagem do frontend — o build já roda ESLint, Prettier e `tsc`       | —                 |
 | `sonarqube`                 | Roda os testes com cobertura (JaCoCo + Vitest/lcov) e envia a análise ao SonarCloud (`sonar-project.properties`) | testes + frontend |
 
@@ -345,6 +361,9 @@ AgendaBeach/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── package.json
+├── perf/
+│   ├── availability.js              # Teste de carga k6 do RNF01 (p95 < 2 s com 50 usuários)
+│   └── seed.sql                     # Quadra usada pelo teste de carga
 ├── docs/
 │   ├── etapa3/                      # Análise, matriz de aceite e débitos da etapa 3
 │   ├── requisitos/                  # Critérios de aceite testáveis
