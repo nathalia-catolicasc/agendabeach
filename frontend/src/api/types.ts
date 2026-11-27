@@ -20,6 +20,20 @@ export type Booking = {
   endTime: string
   courtPrice: number
   status: BookingStatus
+  /** Política de cancelamento vigente (RN04); null quando a reserva não pode mais ser cancelada. */
+  cancellationPolicy?: CancellationPolicy | null
+}
+
+export type CancellationType = 'REFUND' | 'CREDIT' | 'NONE'
+
+/** Calculada pelo backend (CancellationPolicyDTO) — o frontend exibe, não recalcula. */
+export type CancellationPolicy = {
+  type: CancellationType
+  percentage: number
+  refundAmount: number
+  creditAmount: number
+  refundDeadline: string
+  creditDeadline: string
 }
 
 /** Resposta de /users (UserResponseDTO). */

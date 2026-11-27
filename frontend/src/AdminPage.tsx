@@ -13,7 +13,7 @@ import {
   updateCourt,
 } from './api'
 import type { ApiUser, Booking, BookingStatus, Court, CourtType } from './api'
-import { canTryAdmin, getInitials } from './session'
+import { isAdmin, getInitials } from './session'
 import type { SessionUser } from './session'
 import {
   formatCurrency,
@@ -73,7 +73,7 @@ export default function AdminPage({ user, onNavigate, onLogout }: AdminPageProps
   const [courtName, setCourtName] = useState('')
   const [courtType, setCourtType] = useState<CourtType>('OPEN')
 
-  const allowed = canTryAdmin(user)
+  const allowed = isAdmin(user)
 
   const loadData = useCallback(
     () =>

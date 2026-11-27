@@ -48,8 +48,8 @@ Cada fase só termina quando **Nathalia confirma os testes da fase** e **Murilo 
       no `BookingModal`.
 - [ ] Vinícius remove as durações de 1h30 e 2h e gera a grade de 06:00 a 22:00 a partir da resposta da API.
 - [ ] Vinícius exibe o preço vindo de `AvailabilityDTO.price` e remove o cálculo de `estimatePrice`.
-- [ ] Miguel expõe a política de cancelamento (percentual e tipo) no retorno da reserva.
 - [x] Gabriel inclui todos os testes unitários no serviço `backend-unit-tests` (D11).
+- [x] Miguel expõe a política de cancelamento (percentual e tipo) no retorno da reserva.
 - [ ] Nathalia fecha a fase quando `pricing.rules.test.ts` e os testes de tela com sessão CLIENT passarem.
 - [ ] **Aceite do PO:** RN01, RN02, RN04 e RF01 validados na interface com sessão CLIENT.
 
@@ -57,8 +57,8 @@ Cada fase só termina quando **Nathalia confirma os testes da fase** e **Murilo 
 
 - [ ] Vinícius cria a tela de perfil com CPF, o saldo de crédito e a opção "usar crédito" na reserva.
 - [ ] Vinícius adiciona preços e feriados ao painel administrativo.
-- [ ] Miguel unifica `price()` e `dayPrices()` em um único método e calcula feriados móveis a partir da Páscoa.
-- [ ] Miguel troca `RuntimeException` por `ResponseStatusException(404)` e padroniza as mensagens em português.
+- [x] Miguel unifica `price()` e `dayPrices()` em um único método e calcula feriados móveis a partir da Páscoa.
+- [x] Miguel troca `RuntimeException` por `ResponseStatusException(404)` e padroniza as mensagens em português.
 - [ ] Nathalia cobre feriado móvel, uso de crédito e usuário antigo com CPF.
 - [ ] **Aceite do PO:** RN05, RF02, RF03 e RF04 validados na interface.
 
@@ -67,8 +67,8 @@ Cada fase só termina quando **Nathalia confirma os testes da fase** e **Murilo 
 - [ ] Gabriel remove o `db/init.sql` do Docker Compose e deixa o Flyway como única fonte do esquema.
 - [ ] Gabriel inclui um teste k6 de `GET /bookings/availability` no CI, com falha se o p95 passar de 2 s.
 - [ ] Gabriel ativa proteção de branch em `main` e `dev` exigindo 1 aprovação e CI verde.
-- [ ] Miguel agenda a limpeza diária de tokens expirados e adiciona limite de tentativas no login.
-- [ ] Miguel renomeia a pasta `enum`, remove a rota duplicada e os métodos sem uso.
+- [x] Miguel agenda a limpeza diária de tokens expirados e adiciona limite de tentativas no login.
+- [x] Miguel renomeia a pasta `enum`, remove a rota duplicada, os métodos sem uso e o `canTryAdmin`.
 - [ ] Vinícius move `toMinutes` e `toTimeLabel` para um utilitário comum.
 - [x] Murilo registra a decisão sobre a convenção de commits ([ADR-001](../decisoes/ADR-001-convencao-de-commits-e-branches.md)),
       atualiza o [acordo de engenharia](../acordo-de-engenharia.md) e os [critérios de aceite](../requisitos/criterios-de-aceite.md).

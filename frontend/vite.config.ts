@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -13,9 +15,19 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
-      proxy: Object.fromEntries(
-        apiPaths.map((path) => [path, { target, changeOrigin: true }]),
-      ),
+      proxy: Object.fromEntries(apiPaths.map((path) => [path, { target, changeOrigin: true }])),
+    },
+    test: {
+      coverage: {
+        provider: 'v8',
+        // lcov.info é o formato lido pelo SonarCloud (sonar.javascript.lcov.reportPaths).
+        // projectRoot = raiz do repositório, para os caminhos saírem como
+        // "frontend/src/..." — o mesmo caminho que o Sonar enxerga.
+        reporter: ['text-summary', ['lcov', { projectRoot: fileURLToPath(new URL('..', import.meta.url)) }]],
+        reportsDirectory: 'coverage',
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/main.tsx'],
+      },
     },
   }
 })

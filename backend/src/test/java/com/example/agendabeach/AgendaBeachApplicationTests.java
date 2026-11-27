@@ -547,4 +547,90 @@ class AgendaBeachApplicationTests {
                 request("GET", path, alice.token(), null).body().get("status").asText());
         assertEquals(409, request("PUT", path, alice.token(), "{}").status());
     }
+
+    @Test
+    void clientPermissionContractUsedByFrontend() throws Exception {
+        // Regressões R1/R2: o CLIENT não lista todas as reservas, mas consulta a disponibilidade.
+        assertEquals(403, request("GET", "/bookings", alice.token(), null).status());
+        assertEquals(
+                403, request("GET", "/bookings/search?date=2026-10-22", alice.token(), null).status());
+        assertEquals(
+                200,
+                request(
+                                "GET",
+                                "/bookings/availability?date=2026-10-22&courtId=" + court,
+                                alice.token(),
+                                null)
+                        .status());
+        assertEquals(200, request("GET", "/bookings", admin.token(), null).status());
+        assertEquals(
+                200, request("GET", "/bookings/search?date=2026-10-22", admin.token(), null).status());
+    }
+
+    @Test
+    void bookingExposesCancellationPolicyAndDuplicateRouteIsGone() throws Exception {
+        var refundable = book(alice, "2026-10-23T06:00:00", false); // 48h de antecedência
+        assertEquals(200, refundable.status());
+        var policy = refundable.body().get("cancellationPolicy");
+        assertEquals("REFUND", policy.get("type").asText());
+        assertEquals(100, policy.get("percentage").asInt());
+        assertEquals(60, policy.get("refundAmount").asInt());
+        assertEquals("2026-10-22T06:00:00", policy.get("refundDeadline").asText());
+
+        var creditOnly = book(alice, "2026-10-22T06:00:00", false); // exatamente 24h
+        long id = creditOnly.body().get("id").asLong();
+        var shown = creditOnly.body().get("cancellationPolicy");
+        assertEquals("CREDIT", shown.get("type").asText());
+        assertEquals(30, shown.get("creditAmount").asInt());
+
+        int legacyRoute =
+                request("POST", "/bookings/api/bookings/" + id + "/cancel", alice.token(), null)
+                        .status();
+        assertTrue(legacyRoute == 404 || legacyRoute == 405, "status " + legacyRoute);
+
+        var cancelled = request("POST", "/bookings/" + id + "/cancel", alice.token(), null);
+        assertEquals(200, cancelled.status());
+        assertEquals(shown.get("creditAmount").asInt(), cancelled.body().get("creditAmount").asInt());
+        assertTrue(
+                request("GET", "/bookings/" + id, alice.token(), null)
+                        .body()
+                        .get("cancellationPolicy")
+                        .isNull());
+    }
+
+    @Test
+    void errorsArePortugueseAndMissingCourtIsNotFound() throws Exception {
+        var invalidCpf =
+                request(
+                        "POST",
+                        "/users",
+                        null,
+                        "{\"name\":\"X\",\"email\":\"x@example.com\",\"password\":\"password123\",\"cpf\":\"11111111111\"}");
+        assertEquals(400, invalidCpf.status());
+        assertEquals("CPF inválido. Confira os 11 dígitos.", invalidCpf.body().get("detail").asText());
+        var missingCourt = request("GET", "/courts/999999", alice.token(), null);
+        assertEquals(404, missingCourt.status());
+        var slotTaken = book(bob, "2026-10-23T06:00:00", false);
+        assertEquals(200, slotTaken.status());
+        var conflict = book(alice, "2026-10-23T06:00:00", false);
+        assertEquals(409, conflict.status());
+        assertEquals("Quadra já reservada neste horário", conflict.body().get("detail").asText());
+    }
+
+    @Test
+    void repeatedWrongPasswordsBlockLogin() throws Exception {
+        register("carol", "39053344705", false);
+        String wrong = "{\"email\":\"carol@example.com\",\"password\":\"wrong-password\"}";
+        for (int i = 0; i < 5; i++) {
+            assertEquals(401, request("POST", "/users/login", null, wrong).status());
+        }
+        var blocked =
+                request(
+                        "POST",
+                        "/users/login",
+                        null,
+                        "{\"email\":\"carol@example.com\",\"password\":\"password123\"}");
+        assertEquals(429, blocked.status());
+        assertTrue(blocked.body().get("detail").asText().startsWith("Muitas tentativas"));
+    }
 }
