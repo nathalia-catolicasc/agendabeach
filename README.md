@@ -7,6 +7,20 @@ Plataforma para agendamento de quadras de **Beach Tennis**. Permite que clientes
 
 ## 👥 Equipe
 
+### Etapa 3 – Retorno e integração (atual)
+
+| Papel                                 | Integrante                 |
+| ------------------------------------- | -------------------------- |
+| Product Owner e Revisor de Requisitos | Murilo Watanabe            |
+| QA de Regressão                       | Nathalia Berri             |
+| DevOps                                | Gabriel Albani             |
+| Desenvolvedor Backend                 | Miguel Augusto Guedes      |
+| Desenvolvedor Frontend                | Vinícius Henrique da Silva |
+
+Análise do ciclo anterior, matriz de aceite e plano de refatoração: [`docs/etapa3/`](docs/etapa3/README.md).
+
+### Etapa 2 – Manutenção (equipe anterior)
+
 | Papel                    | Integrante                 |
 | ------------------------ | -------------------------- |
 | Product Owner (PO)       | Rubem Gustavo Krüger       |
@@ -34,17 +48,21 @@ Plataforma para agendamento de quadras de **Beach Tennis**. Permite que clientes
 Com **Docker** e **Docker Compose** instalados, não é necessário instalar Java, Node ou PostgreSQL manualmente na sua máquina.
 
 ```bash
-git clone https://github.com/avilasj/agendabeach.git
-cd AgendaBeach
+git clone https://github.com/nathalia-catolicasc/agendabeach.git
+cd agendabeach
 
 docker compose up -d --build
 ```
 
-| Serviço        | Endereço              |
-| -------------- | --------------------- |
-| Frontend       | http://localhost:5173 |
-| Backend (API)  | http://localhost:8080 |
-| Banco de dados | localhost:5432        |
+| Serviço        | Endereço                                                                            |
+| -------------- | ----------------------------------------------------------------------------------- |
+| Frontend       | http://localhost:5173                                                               |
+| Backend (API)  | http://localhost:8080                                                               |
+| Swagger UI     | http://localhost:8080/swagger-ui/index.html                                         |
+| Banco de dados | Sem porta no host (desde `d5eb587`); use `docker compose exec db psql -U postgres -d agendabeach` |
+
+> Para rodar o backend nativamente contra o banco do Compose, publique a porta temporariamente com um
+> `docker-compose.override.yml` local (não versionado) contendo `ports: ["5432:5432"]` no serviço `db`.
 
 ```bash
 docker compose down       # para tudo, mantém os dados do banco
@@ -76,22 +94,32 @@ Modelo adotado: **GitHub Flow com branch de integração (`dev`)** — um Git Fl
 | `dev`                                     | Branch de integração contínua. Toda feature/correção chega aqui primeiro, via PR.                    |
 | `feat/<n-issue>/<nome-da-funcionalidade>` | Nova funcionalidade. Ex.: `feat/12/cadastro-quadra`                                                  |
 | `fix/<n-issue>/<descricao>`               | Correção de bug. Ex.: `fix/27/reserva-duplicada`                                                     |
+| `<tipo>/<n-issue>/<descricao>`            | Demais tipos (`refactor`, `docs`, `test`, `ci`, `chore`). Ex.: `docs/40/criterios-de-aceite`         |
 
 ### Regras
 
 - Nunca commitar direto em `main` ou `dev` — sempre via Pull Request.
 - Toda branch nasce a partir da `dev` atualizada.
 - Branch é deletada após o merge.
+- O número da Issue é **obrigatório** no nome da branch, que fica toda em minúsculas ([ADR-001](docs/decisoes/ADR-001-convencao-de-commits-e-branches.md)).
 - `main` só avança em pontos de release, com a suíte de CI 100% verde.
 
 > Se o time quiser simplificar ainda mais no futuro, o **GitHub Flow puro** (só `main` + branches de feature, sem `dev`) também é uma opção válida para um projeto deste porte — vale uma conversa de time antes de mudar.
 
 ## 📝 Padronização de Commits
 
-Adotamos **Conventional Commits** ([conventionalcommits.org](https://www.conventionalcommits.org)):
+Adotamos **Conventional Commits** ([conventionalcommits.org](https://www.conventionalcommits.org)).
+
+> **Decisão registrada:** a convenção substitui os prefixos `feat`/`bug`/`refactor`/`docs` do acordo de
+> 07/08/2026 — `bug` passa a ser `fix`. Contexto, alternativas e consequências em
+> [ADR-001](docs/decisoes/ADR-001-convencao-de-commits-e-branches.md).
 
 ```
 <tipo>(<escopo opcional>): <descrição>
+
+<corpo opcional: o porquê da mudança>
+
+Refs #<n-issue>
 ```
 
 | Tipo       | Uso                                                          |
@@ -120,7 +148,8 @@ ci: separa testes unitários e de integração no pipeline
 
 - Descrição no imperativo, minúscula, sem ponto final.
 - Primeira linha com até 72 caracteres.
-- Um commit = uma mudança lógica.
+- Um commit = uma mudança lógica. Se a descrição precisa de "e", divida o commit.
+- Rodapé `Refs #<n-issue>` (ou `Closes #<n-issue>` no PR) para manter a rastreabilidade.
 - Mudança que quebra compatibilidade: rodapé `BREAKING CHANGE: <explicação>`.
 
 ## 🔁 Fluxo de Trabalho
@@ -137,7 +166,7 @@ Sem uma ferramenta paga de gestão, o fluxo do time roda 100% dentro do GitHub:
 3. Criar a branch a partir da `dev`: `git checkout -b feat/<n-issue>/<nome-da-funcionalidade>`.
 4. Desenvolver seguindo o [Guia de Estilo](#-guia-de-estilo-e-padrões-de-código), commitando em Conventional Commits.
 5. Abrir o Pull Request para `dev`, referenciando a Issue no corpo (`Closes #12`) — fecha a Issue automaticamente ao mesclar.
-6. **Code Review obrigatório** de ao menos 1 outro dev/QA.
+6. **Code Review obrigatório** de ao menos 1 outro dev/QA — o autor não mescla o próprio PR sem aprovação registrada. O [modelo de PR](.github/PULL_REQUEST_TEMPLATE.md) traz o checklist do DoD.
 7. Validação de QA conforme o [DoD](#-definition-of-done-dod).
 8. Merge na `dev` só com CI verde (compilação, testes unitários, testes de integração, build das imagens e SonarCloud) e sem conflitos.
 9. Branch deletada após o merge; card movido para `Concluído` no Project.
@@ -170,6 +199,8 @@ Uma tarefa só pode ser puxada para desenvolvimento se cumprir **100%** dos iten
 - [ ] **Critérios de Aceite** descritos sem ambiguidade (ex.: "Não permitir cancelamento com menos de 2h de antecedência").
 - [ ] **Regras de Negócio e Exceções mapeadas** (horário de pico, tarifas, limites por CPF).
 - [ ] **Dependências mapeadas** (modelagem de banco, rotas de API).
+- [ ] **Impacto nas camadas:** arquivos de backend que mudam, telas de frontend que consomem o que muda e teste que prova a regra nas duas camadas.
+- [ ] **Contrato de permissão:** perfil que pode chamar cada endpoint novo ou alterado.
 - [ ] **Protótipo aprovado pelo PO** (para tarefas com interface).
 
 ## 🏁 Definition of Done (DoD)
@@ -178,7 +209,8 @@ Uma funcionalidade só é considerada **Concluída** se atender rigorosamente a:
 
 - [ ] **Padrão de código** conforme o guia de estilo (React.js frontend / Java Spring Boot backend).
 - [ ] **Code Review aprovado** por ≥ 1 dev/QA via Pull Request.
-- [ ] **Validação de QA** nos ambientes de teste — sem bugs de severidade alta ou crítica em aberto.
+- [ ] **Validação de QA** com os perfis **CLIENT e ADMIN** — sem bugs de severidade alta ou crítica em aberto.
+- [ ] **Teste automatizado** para cada [critério de aceite](docs/requisitos/criterios-de-aceite.md) tocado.
 - [ ] **Código mesclado na `dev`** sem conflitos de versionamento.
 - [ ] **Documentação atualizada** — endpoints criados/alterados no Swagger/OpenAPI.
 
@@ -186,11 +218,13 @@ Uma funcionalidade só é considerada **Concluída** se atender rigorosamente a:
 
 ### Registro
 
-Todo atalho técnico, regra simplificada temporariamente ou pendência de refatoração deve ser registrado como **card no backlog do Jira com a tag `Débito Técnico`**, contendo:
+Todo atalho técnico, regra simplificada temporariamente ou pendência de refatoração deve ser registrado como **Issue no GitHub com o modelo "Débito técnico" e a label `débito-técnico`** (o acordo de 07/08 citava o Jira, que não foi adotado), contendo:
 
 - Justificativa da decisão.
 - Localização no código.
 - Impacto potencial na manutenibilidade.
+
+Backlog atual priorizado pelo PO: [docs/etapa3/05-debitos-tecnicos.md](docs/etapa3/05-debitos-tecnicos.md).
 
 ### Priorização e Pagamento
 
@@ -208,7 +242,7 @@ Localização: `backend/src/test/java`. Dois tipos de teste convivem no projeto:
 
 | Tipo       | Classes                                 | Precisa de banco?                     |
 | ---------- | --------------------------------------- | ------------------------------------- |
-| Unitário   | `UserServiceTest`, `BookingServiceTest` | Não (mocks via Mockito)               |
+| Unitário   | `UserServiceTest`, `BookingServiceTest`, `BookingRulesTest`, `PricingServiceTest`, `CpfValidatorTest` | Não (mocks via Mockito) |
 | Integração | `AgendaBeachApplicationTests`           | Sim (sobe o contexto Spring completo) |
 
 **Via Docker (recomendado):**
@@ -228,16 +262,21 @@ cd backend
 
 ### Frontend
 
-O projeto ainda não tem suíte de testes automatizados (unitários/E2E) no frontend — hoje as garantias de qualidade são **ESLint**, **Prettier** e o **build do TypeScript**, que já rodam no CI a cada PR:
+O frontend usa **Vitest** (`npm test`). Hoje a suíte cobre login, sessão, cadastro e CPF (`src/api/auth.test.ts`, `src/cpf.test.ts`); as telas de reserva, cancelamento e administração ainda não têm testes (débito D5). Além dos testes, **ESLint**, **Prettier** e o **build do TypeScript** rodam no build da imagem a cada PR:
 
 ```bash
 cd frontend
+npm test
 npm run lint
 npx prettier --check "src/**/*.{ts,tsx,css}"
 npm run build
 ```
 
-> Introduzir Vitest + Testing Library para componentes e regras de negócio do frontend (cálculo de tarifas, validação de formulários) é uma melhoria recomendada — fica como sugestão para o time avaliar.
+> Atenção: o serviço `backend-unit-tests` do `docker-compose.yml` ainda executa só `UserServiceTest` e `BookingServiceTest` (débito D11).
+
+### Critérios de aceite
+
+Os critérios **Dado / Quando / Então** de cada RN, RF e RNF, com a rastreabilidade para os testes, estão em [docs/requisitos/criterios-de-aceite.md](docs/requisitos/criterios-de-aceite.md).
 
 ### Registro de Bugs
 
@@ -269,6 +308,8 @@ Pipeline 100% baseado em **Docker**, definido em `.github/workflows/ci.yml`, dis
 ```
 AgendaBeach/
 ├── .github/
+│   ├── ISSUE_TEMPLATE/             # Modelos de história, bug e débito técnico
+│   ├── PULL_REQUEST_TEMPLATE.md    # Checklist do DoD
 │   └── workflows/
 │       └── ci.yml                  # Pipeline de CI/CD (GitHub Actions)
 ├── backend/                        # API REST — Java 21 + Spring Boot 4.1.1
@@ -291,7 +332,8 @@ AgendaBeach/
 │   │   │   ├── config/             # Configurações (Spring Security etc.)
 │   │   │   └── AgendaBeachApplication.java
 │   │   ├── main/resources/
-│   │   │   └── application.properties
+│   │   │   ├── application.properties
+│   │   │   └── db/migration/       # Migrações Flyway (V1, V2) — fonte do schema
 │   │   └── test/java/com/          # Testes (JUnit 5 + Mockito)
 │   ├── Dockerfile
 │   ├── pom.xml
@@ -306,7 +348,12 @@ AgendaBeach/
 │   ├── nginx.conf
 │   └── package.json
 ├── db/
-│   └── init.sql                     # Schema do PostgreSQL (tabelas, enums, constraints)
+│   └── init.sql                     # Cópia do Flyway V1 usada pelo Compose (débito D4)
+├── docs/
+│   ├── etapa3/                      # Análise, matriz de aceite e débitos da etapa 3
+│   ├── requisitos/                  # Critérios de aceite testáveis
+│   ├── decisoes/                    # Registro de decisões (ADR)
+│   └── acordo-de-engenharia.md      # Acordo de Engenharia v2
 ├── docker-compose.yml
 └── README.md
 ```
