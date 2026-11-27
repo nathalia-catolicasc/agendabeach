@@ -5,11 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.bookings.dto.BookingResponseDTO;
+import com.bookings.dto.CancellationPolicyDTO;
 import com.bookings.dto.CancellationResponseDTO;
 import com.bookings.dto.CreateBookingDTO;
 import com.bookings.entity.Booking;
 import com.bookings.entity.Court;
 import com.bookings.enums.BookingStatus;
+import com.bookings.enums.CancellationType;
 import com.bookings.enums.CourtStatus;
 import com.bookings.enums.CourtType;
 import com.bookings.repository.BookingRepository;
@@ -97,7 +99,7 @@ class BookingServiceTest {
                                         new CreateBookingDTO(
                                                 1L, 2L, START, START.minusMinutes(30), false)));
 
-        assertTrue(error.getMessage().toLowerCase().contains("end time"));
+        assertEquals(BookingService.INVALID_DURATION, error.getMessage());
         verifyNoInteractions(courtRepository, pricingService);
         verify(bookingRepository, never()).saveAndFlush(any());
     }
@@ -117,7 +119,7 @@ class BookingServiceTest {
                                         new CreateBookingDTO(
                                                 1L, 2L, START, START.plusHours(1), false)));
 
-        assertEquals("Court is inactive", error.getMessage());
+        assertEquals(BookingService.COURT_INACTIVE, error.getMessage());
         verifyNoInteractions(pricingService);
         verify(bookingRepository, never()).saveAndFlush(any());
     }
@@ -136,7 +138,7 @@ class BookingServiceTest {
                                                 1L, 2L, START, START.plusHours(1), false)));
 
         assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
-        assertEquals("User not found", error.getReason());
+        assertEquals(BookingService.USER_NOT_FOUND, error.getReason());
         verifyNoInteractions(courtRepository, pricingService);
     }
 
@@ -154,7 +156,7 @@ class BookingServiceTest {
                                                 1L, 2L, START, START.plusHours(1), false)));
 
         assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
-        assertEquals("Court not found", error.getReason());
+        assertEquals(BookingService.COURT_NOT_FOUND, error.getReason());
         verifyNoInteractions(pricingService);
     }
 
@@ -213,7 +215,7 @@ class BookingServiceTest {
         IllegalStateException error =
                 assertThrows(IllegalStateException.class, () -> bookingService.cancel(5L));
 
-        assertEquals("Only future scheduled bookings can change", error.getMessage());
+        assertEquals(BookingService.NOT_CHANGEABLE, error.getMessage());
         assertEquals(0, booking.getUser().getCreditBalance().signum());
         verify(bookingRepository, never()).saveAndFlush(any());
     }
@@ -226,10 +228,59 @@ class BookingServiceTest {
                 assertThrows(ResponseStatusException.class, () -> bookingService.delete(99L));
 
         assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
-        assertEquals("Booking not found", error.getReason());
+        assertEquals(BookingService.BOOKING_NOT_FOUND, error.getReason());
         verify(bookingRepository, never()).deleteById(any());
         verify(bookingRepository, never()).saveAndFlush(any());
         verifyNoInteractions(userRepository);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "30,REFUND,100,100.00,0.00",
+        "24,CREDIT,50,0.00,50.00",
+        "3,CREDIT,50,0.00,50.00",
+        "2,CREDIT,50,0.00,50.00",
+        "1,NONE,0,0.00,0.00"
+    })
+    void getById_ShouldExposeCancellationPolicy(
+            long hours, CancellationType type, int percentage, String refund, String credit) {
+        Booking booking = scheduledBookingStartingIn(hours);
+        booking.setCourt(activeCourt());
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+
+        CancellationPolicyDTO policy = bookingService.getById(5L).cancellationPolicy();
+
+        assertEquals(type, policy.type());
+        assertEquals(0, new BigDecimal(percentage).compareTo(policy.percentage()));
+        assertEquals(new BigDecimal(refund), policy.refundAmount());
+        assertEquals(new BigDecimal(credit), policy.creditAmount());
+        assertEquals(booking.getStartTime().minusHours(24), policy.refundDeadline());
+        assertEquals(booking.getStartTime().minusHours(2), policy.creditDeadline());
+        verify(authService).ensureOwner(1L);
+    }
+
+    @Test
+    void getById_ShouldOmitCancellationPolicy_WhenBookingCannotBeCancelled() {
+        Booking booking = scheduledBookingStartingIn(30);
+        booking.setCourt(activeCourt());
+        booking.setStatus(BookingStatus.CANCELLED);
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+
+        assertNull(bookingService.getById(5L).cancellationPolicy());
+    }
+
+    @Test
+    void cancel_ShouldMatchPolicyShownBeforehand() {
+        Booking booking = scheduledBookingStartingIn(3);
+        booking.setCourt(activeCourt());
+        when(bookingRepository.findById(5L)).thenReturn(Optional.of(booking));
+        CancellationPolicyDTO shown = bookingService.getById(5L).cancellationPolicy();
+        prepareCancellation(booking);
+
+        CancellationResponseDTO response = bookingService.cancel(5L);
+
+        assertEquals(shown.refundAmount(), response.refundAmount());
+        assertEquals(shown.creditAmount(), response.creditAmount());
     }
 
     private void prepareUser() {
