@@ -7,13 +7,17 @@ import com.bookings.entity.Court;
 import com.bookings.enums.CourtStatus;
 import com.bookings.repository.CourtRepository;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class CourtService {
+
+    static final String COURT_NOT_FOUND = "Quadra não encontrada";
 
     private final CourtRepository courtRepository;
 
@@ -26,32 +30,20 @@ public class CourtService {
         court.setName(dto.name());
         court.setType(dto.type());
         court.setStatus(dto.status() != null ? dto.status() : CourtStatus.ACTIVE);
-
-        Court saved = courtRepository.save(court);
-        return new CourtResponseDTO(
-                saved.getId(), saved.getName(), saved.getType(), saved.getStatus());
+        return response(courtRepository.save(court));
     }
 
     public List<CourtResponseDTO> listAll() {
-        return courtRepository.findAll().stream()
-                .map(c -> new CourtResponseDTO(c.getId(), c.getName(), c.getType(), c.getStatus()))
-                .collect(Collectors.toList());
+        return courtRepository.findAll().stream().map(CourtService::response).toList();
     }
 
     public CourtResponseDTO getById(Long id) {
-        Court c =
-                courtRepository
-                        .findById(id)
-                        .orElseThrow(() -> new RuntimeException("Court not found"));
-        return new CourtResponseDTO(c.getId(), c.getName(), c.getType(), c.getStatus());
+        return response(courtRepository.findById(id).orElseThrow(CourtService::notFound));
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public CourtResponseDTO update(Long id, UpdateCourtDTO dto) {
-        Court court =
-                courtRepository
-                        .lockById(id)
-                        .orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court = courtRepository.lockById(id).orElseThrow(CourtService::notFound);
         if (dto.name() != null && !dto.name().isBlank()) {
             court.setName(dto.name());
         }
@@ -61,15 +53,22 @@ public class CourtService {
         if (dto.status() != null) {
             court.setStatus(dto.status());
         }
-        Court saved = courtRepository.save(court);
-        return new CourtResponseDTO(
-                saved.getId(), saved.getName(), saved.getType(), saved.getStatus());
+        return response(courtRepository.save(court));
     }
 
     public void delete(Long id) {
         if (!courtRepository.existsById(id)) {
-            throw new RuntimeException("Court not found");
+            throw notFound();
         }
         courtRepository.deleteById(id);
+    }
+
+    private static ResponseStatusException notFound() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, COURT_NOT_FOUND);
+    }
+
+    private static CourtResponseDTO response(Court court) {
+        return new CourtResponseDTO(
+                court.getId(), court.getName(), court.getType(), court.getStatus());
     }
 }

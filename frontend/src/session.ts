@@ -61,10 +61,6 @@ export function isAdmin(user: SessionUser | null) {
   return user?.profile === 'ADMIN'
 }
 
-export function canTryAdmin(user: SessionUser | null) {
-  return isAdmin(user)
-}
-
 export function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'AB'
