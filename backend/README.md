@@ -16,9 +16,9 @@ A imagem de produção executa a API como `app:app` (UID/GID 10001), sem privil�
 
 ## Migração de banco
 
-Flyway executa as migrações em `src/main/resources/db/migration/` antes da validação Hibernate. Bancos vazios recebem V1 e V2. Bancos existentes criados pelo `db/init.sql` são reconhecidos como V1 e recebem V2, sem recriar tabelas nem apagar reservas. O usuário do banco precisa poder criar extensão `btree_gist`, tabelas e índices, ou a extensão deve ser provisionada antes pelo administrador.
+Flyway executa as migrações em `src/main/resources/db/migration/` antes da validação Hibernate. O Flyway é a única fonte do esquema: o Docker Compose sobe o PostgreSQL vazio e o backend cria as tabelas na primeira inicialização. Bancos vazios recebem V1 e V2. Bancos existentes criados pelo antigo `db/init.sql` (removido na etapa 3, débito D4) são reconhecidos como V1 e recebem V2, sem recriar tabelas nem apagar reservas. O usuário do banco precisa poder criar extensão `btree_gist`, tabelas e índices, ou a extensão deve ser provisionada antes pelo administrador.
 
-Faça backup antes de atualizar uma instalação com dados reais. Não execute manualmente `db/init.sql` sobre um banco existente nem altere migrações já aplicadas.
+Faça backup antes de atualizar uma instalação com dados reais. Não execute scripts SQL manualmente sobre um banco existente nem altere migrações já aplicadas; toda mudança de esquema entra como uma nova migração `V<n>__descricao.sql`.
 
 Usuários antigos permanecem com CPF nulo até cadastrá-lo por `PUT /users/{id}`. Não podem fazer novas reservas sem CPF válido. O CPF é único, normalizado para 11 dígitos, validado pelos dígitos verificadores e não pode ser trocado após o cadastro. O CPF não é exposto nas respostas públicas de usuário. Reservas antigas e seus preços são preservados; alterações de horário devem obedecer às novas regras.
 

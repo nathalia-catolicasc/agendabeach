@@ -64,7 +64,7 @@ Cada fase só termina quando **Nathalia confirma os testes da fase** e **Murilo 
 
 ### Fase 3 – Pronto para produção (D4, D5, D8, D9, D10)
 
-- [ ] Gabriel remove o `db/init.sql` do Docker Compose e deixa o Flyway como única fonte do esquema.
+- [x] Gabriel remove o `db/init.sql` do Docker Compose e deixa o Flyway como única fonte do esquema.
 - [ ] Gabriel inclui um teste k6 de `GET /bookings/availability` no CI, com falha se o p95 passar de 2 s.
 - [ ] Gabriel ativa proteção de branch em `main` e `dev` exigindo 1 aprovação e CI verde.
 - [x] Miguel agenda a limpeza diária de tokens expirados e adiciona limite de tentativas no login.

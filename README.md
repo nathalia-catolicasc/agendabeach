@@ -345,8 +345,6 @@ AgendaBeach/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── package.json
-├── db/
-│   └── init.sql                     # Cópia do Flyway V1 usada pelo Compose (débito D4)
 ├── docs/
 │   ├── etapa3/                      # Análise, matriz de aceite e débitos da etapa 3
 │   ├── requisitos/                  # Critérios de aceite testáveis
