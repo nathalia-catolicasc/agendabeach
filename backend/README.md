@@ -1,6 +1,6 @@
 # Backend AgendaBeach
 
-Java 21, Spring Boot 4.1.1 e PostgreSQL 16. Estas mudanças atendem às regras dos documentos de requisitos somente no backend. Nenhum arquivo do frontend foi alterado.
+Java 21, Spring Boot 4.1.1 e PostgreSQL 16. As regras dos documentos de requisitos estão implementadas no backend. O commit `d6f522d` não alterou o frontend; o `553a2b8` integrou depois o cadastro com CPF e o login Bearer. As demais telas ainda usam as regras antigas — veja a [matriz de aceite da etapa 3](../docs/etapa3/04-matriz-aceite.md).
 
 ## Executar
 
@@ -44,7 +44,7 @@ Envie `Authorization: Bearer <accessToken>` nas requisições protegidas. Os tok
 
 O proprietário e o administrador podem consultar/alterar o usuário e suas reservas. Listagem geral de usuários, reservas e buscas que expõem usuários são restritas ao administrador. Alterações em quadras, tarifas e feriados também exigem ADMIN. A criação de administradores permanece uma operação controlada da instalação, sem endpoint público de promoção.
 
-**Compatibilidade:** o frontend integra cadastro com CPF e login Bearer, usa o perfil retornado pela API e revoga o token ao sair. Sessões antigas sem token exigem novo login. Os fluxos de grade, preços e reservas ainda precisam de integração com os novos contratos, pois a interface pode gerar durações e valores incompatíveis e consultar listagens administrativas. Não há autenticação por `X-User-Id`. O proxy do frontend também não encaminha `/pricing`, `/v3/api-docs` ou `/swagger-ui`; esses recursos estão disponíveis diretamente na API.
+**Compatibilidade:** o frontend integra cadastro com CPF e login Bearer, usa o perfil retornado pela API e revoga o token ao sair. Sessões antigas sem token exigem novo login. Os fluxos de grade, preços e reservas ainda precisam de integração com os novos contratos, pois a interface pode gerar durações e valores incompatíveis e consultar listagens administrativas. Não há autenticação por `X-User-Id`. Na base `1baf6c3`, a tela de reservas chama `GET /bookings` e `GET /bookings/search`, restritos a ADMIN, e por isso não carrega para CLIENT (regressões R1 e R2, débito D2 em [docs/etapa3/05-debitos-tecnicos.md](../docs/etapa3/05-debitos-tecnicos.md)). O proxy do frontend também não encaminha `/pricing`, `/v3/api-docs` ou `/swagger-ui`; esses recursos estão disponíveis diretamente na API.
 
 ## Reservas e disponibilidade
 
