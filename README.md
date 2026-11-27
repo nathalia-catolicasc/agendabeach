@@ -272,8 +272,6 @@ npx prettier --check "src/**/*.{ts,tsx,css}"
 npm run build
 ```
 
-> Atenção: o serviço `backend-unit-tests` do `docker-compose.yml` ainda executa só `UserServiceTest` e `BookingServiceTest` (débito D11).
-
 ### Critérios de aceite
 
 Os critérios **Dado / Quando / Então** de cada RN, RF e RNF, com a rastreabilidade para os testes, estão em [docs/requisitos/criterios-de-aceite.md](docs/requisitos/criterios-de-aceite.md).

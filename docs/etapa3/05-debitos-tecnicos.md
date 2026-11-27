@@ -49,7 +49,7 @@ Cada fase só termina quando **Nathalia confirma os testes da fase** e **Murilo 
 - [ ] Vinícius remove as durações de 1h30 e 2h e gera a grade de 06:00 a 22:00 a partir da resposta da API.
 - [ ] Vinícius exibe o preço vindo de `AvailabilityDTO.price` e remove o cálculo de `estimatePrice`.
 - [ ] Miguel expõe a política de cancelamento (percentual e tipo) no retorno da reserva.
-- [ ] Gabriel inclui todos os testes unitários no serviço `backend-unit-tests` (D11).
+- [x] Gabriel inclui todos os testes unitários no serviço `backend-unit-tests` (D11).
 - [ ] Nathalia fecha a fase quando `pricing.rules.test.ts` e os testes de tela com sessão CLIENT passarem.
 - [ ] **Aceite do PO:** RN01, RN02, RN04 e RF01 validados na interface com sessão CLIENT.
 
