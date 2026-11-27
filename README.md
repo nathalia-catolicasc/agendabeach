@@ -299,7 +299,7 @@ Pipeline 100% baseado em **Docker**, definido em `.github/workflows/ci.yml`, dis
 | `backend-integration-tests` | Sobe um PostgreSQL real via Docker Compose e roda o teste de contexto Spring | `backend-compile` |
 | `backend-image`             | Builda a imagem final de produção do backend                                 | testes acima      |
 | `frontend`                  | Builda a imagem do frontend — o build já roda ESLint, Prettier e `tsc`       | —                 |
-| `sonarqube`                 | Compila o backend nativamente e envia a análise ao SonarCloud                | testes + frontend |
+| `sonarqube`                 | Roda os testes com cobertura (JaCoCo + Vitest/lcov) e envia a análise ao SonarCloud (`sonar-project.properties`) | testes + frontend |
 
 **Regra de qualidade:** nenhum PR é aprovado com jobs vermelhos, ou com _issues_ críticas apontadas pelo SonarCloud (bugs, vulnerabilidades, code smells graves, duplicação acima do limite do Quality Gate). O SonarCloud comenta diretamente no PR com o resultado.
 
